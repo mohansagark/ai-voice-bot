@@ -60,3 +60,5 @@ export function loadConfig(env: Env): AppConfig {
     maxTurnsPerSession: Number(env.MAX_TURNS_PER_SESSION || "30"),
   };
 }
+
+export type { Consent } from "./agent/state";
