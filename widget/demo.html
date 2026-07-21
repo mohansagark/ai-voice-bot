@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>AI Voice Bot — v0.1 demo</title>
+<style>
+  body { font: 15px system-ui; max-width: 560px; margin: 40px auto; }
+  #log { border: 1px solid #ddd; border-radius: 8px; padding: 12px; min-height: 200px; }
+  .u { color: #333; } .a { color: #6c5ce7; } .m { margin: 6px 0; }
+  form { display: flex; gap: 8px; margin-top: 12px; }
+  input { flex: 1; padding: 10px; } button { padding: 10px 16px; }
+</style>
+<h1>AI Voice Bot — v0.1</h1>
+<div id="log"></div>
+<form id="f"><input id="i" placeholder="Say hi…" autocomplete="off" /><button>Send</button></form>
+<script>
+  const WORKER = "http://localhost:8787";      // wrangler dev default
+  const messages = [];
+  const log = document.getElementById("log");
+  function add(role, text) {
+    const d = document.createElement("div");
+    d.className = "m " + (role === "user" ? "u" : "a");
+    d.textContent = (role === "user" ? "You: " : "Bot: ") + text;
+    log.appendChild(d);
+  }
+  document.getElementById("f").onsubmit = async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("i");
+    const text = input.value.trim(); if (!text) return;
+    input.value = "";
+    messages.push({ role: "user", content: text }); add("user", text);
+    const res = await fetch(WORKER + "/chat", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ messages, consent: { agreed: true, timestamp: new Date().toISOString() } }),
+    });
+    const data = await res.json();
+    if (data.reply) { messages.push({ role: "assistant", content: data.reply }); add("assistant", data.reply); }
+    if (data.lead_saved) add("assistant", "✅ lead saved: " + JSON.stringify(data.lead));
+  };
+</script>
