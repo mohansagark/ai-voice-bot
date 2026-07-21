@@ -1,4 +1,4 @@
-# Portfolio Chatbot v0.1 — Implementation Plan
+# AI Voice Bot v0.1 — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -66,7 +66,7 @@ README.md
 `worker/package.json`:
 ```json
 {
-  "name": "portfolio-chat-worker",
+  "name": "ai-voice-bot-worker",
   "private": true,
   "type": "module",
   "scripts": {
@@ -111,7 +111,7 @@ README.md
 
 `worker/wrangler.toml`:
 ```toml
-name = "portfolio-chat"
+name = "ai-voice-bot"
 main = "src/index.ts"
 compatibility_date = "2024-09-01"
 compatibility_flags = ["nodejs_compat"]
@@ -143,6 +143,7 @@ WEBHOOK_URL=https://formspree.io/f/xxxx
 `worker/src/config.ts`:
 ```ts
 export interface Persona {
+  botName: string;                       // visitor-facing name the bot goes by (configurable)
   owner: { name: string; role: string };
   bio: string;
   tone: string;
@@ -172,6 +173,7 @@ export interface Env {
 }
 
 export const defaultPersona: Persona = {
+  botName: "Leo",
   owner: { name: "Mohan Sagar K", role: "Software Engineer" },
   bio: "Senior software engineer specializing in AI and frontend.",
   tone: "friendly, concise, professional",
@@ -283,7 +285,7 @@ Expected: PASS (1 passed).
 - [ ] **Step 7: Commit**
 
 ```bash
-cd ~/Documents/portfolio-chatbot
+cd ~/Documents/ai-voice-bot
 git add worker/
 git commit -m "feat(worker): scaffold Cloudflare Worker with /health endpoint"
 ```
@@ -413,6 +415,9 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("Mohan Sagar K");
     expect(prompt).toContain("Software Engineer");
   });
+  it("introduces itself by the configured bot name", () => {
+    expect(prompt).toContain("Leo");
+  });
   it("includes every allowed fact", () => {
     for (const fact of defaultPersona.facts) expect(prompt).toContain(fact);
   });
@@ -440,7 +445,7 @@ export function buildSystemPrompt(p: Persona): string {
   const facts = p.facts.map((f) => `- ${f}`).join("\n");
   const doNot = p.do_not.map((d) => `- ${d}`).join("\n");
   return [
-    `You are ${p.owner.name}'s assistant on their personal website. ${p.owner.name} is a ${p.owner.role}.`,
+    `You are ${p.botName}, ${p.owner.name}'s assistant on their personal website. ${p.owner.name} is a ${p.owner.role}.`,
     `Tone: ${p.tone}.`,
     ``,
     `FACTS YOU MAY STATE (say nothing beyond these):`,
@@ -1079,7 +1084,7 @@ git commit -m "feat(worker): /chat endpoint wiring the LangGraph agent with guar
 ```html
 <!doctype html>
 <meta charset="utf-8" />
-<title>Portfolio Chatbot — v0.1 demo</title>
+<title>AI Voice Bot — v0.1 demo</title>
 <style>
   body { font: 15px system-ui; max-width: 560px; margin: 40px auto; }
   #log { border: 1px solid #ddd; border-radius: 8px; padding: 12px; min-height: 200px; }
@@ -1087,7 +1092,7 @@ git commit -m "feat(worker): /chat endpoint wiring the LangGraph agent with guar
   form { display: flex; gap: 8px; margin-top: 12px; }
   input { flex: 1; padding: 10px; } button { padding: 10px 16px; }
 </style>
-<h1>Portfolio Chatbot — v0.1</h1>
+<h1>AI Voice Bot — v0.1</h1>
 <div id="log"></div>
 <form id="f"><input id="i" placeholder="Say hi…" autocomplete="off" /><button>Send</button></form>
 <script>
@@ -1121,7 +1126,7 @@ git commit -m "feat(worker): /chat endpoint wiring the LangGraph agent with guar
 
 `README.md` (repo root):
 ```md
-# Portfolio Chatbot
+# AI Voice Bot
 
 Agentic voice greeter for a portfolio site — LangGraph.js in a Cloudflare Worker.
 See `docs/superpowers/specs/` for the full design.
@@ -1157,7 +1162,7 @@ Expected: the bot greets, collects the fields, and returns `✅ lead saved`; the
 - [ ] **Step 4: Commit**
 
 ```bash
-cd ~/Documents/portfolio-chatbot
+cd ~/Documents/ai-voice-bot
 git add widget/demo.html README.md
 git commit -m "feat: text-only demo page and v0.1 README with local dev + smoke test"
 ```

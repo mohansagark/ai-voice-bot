@@ -83,12 +83,12 @@ configured entirely through a `window` config object.
 ┌─────────────────────────────────────────────┐
 │              Visitor's Browser                │
 │  ┌─────────────────────────────────────────┐ │
-│  │  portfolio-chat.min.js  (the widget)     │ │
+│  │  ai-voice-bot.min.js  (the widget)     │ │
 │  │  ┌───────┐ ┌────────┐ ┌───────────────┐  │ │
 │  │  │  Orb  │ │ Voice  │ │ Chat client   │  │ │
 │  │  │  UI   │ │ STT/TTS│ │ (SSE) + lead  │  │ │
 │  │  └───────┘ └────────┘ └───────────────┘  │ │
-│  │        reads window.PortfolioChatConfig   │ │
+│  │        reads window.AiVoiceBotConfig   │ │
 │  └───────────────────┬──────────────────────┘ │
 └──────────────────────┼────────────────────────┘
                        │ HTTPS (no secrets)
@@ -118,7 +118,7 @@ configured entirely through a `window` config object.
 ```
 
 **Two deployable units:**
-1. **The widget** (`portfolio-chat.min.js`) — served from CDN or self-hosted; runs in the browser.
+1. **The widget** (`ai-voice-bot.min.js`) — served from CDN or self-hosted; runs in the browser.
 2. **The Worker** (`LangGraph.js` agent) — deployed by the installer via `wrangler deploy`;
    holds keys, runs the agent, is the edge.
 
@@ -295,7 +295,7 @@ worker/
 ```
 widget/
   src/
-    index.js          entry; reads window.PortfolioChatConfig; mounts widget
+    index.js          entry; reads window.AiVoiceBotConfig; mounts widget
     config.js         schema, defaults, validation, error messages
     orb.js            voice-first orb UI + states (idle/listening/thinking/speaking)
     panel.js          expandable text transcript + input (always available)
@@ -344,17 +344,17 @@ TTS: try neural-via-Worker (if configured) → else best browser voice → else 
 
 ## 6. Configuration Schema
 
-### 6.1 Widget (`window.PortfolioChatConfig`)
+### 6.1 Widget (`window.AiVoiceBotConfig`)
 ```js
-window.PortfolioChatConfig = {
-  workerUrl: "https://chat.devmohan.in",   // the deployed Cloudflare Worker
+window.AiVoiceBotConfig = {
+  workerUrl: "https://voicebot.devmohan.in",   // the deployed Cloudflare Worker
 
   branding: {
-    botName: "Mohan's Assistant",
+    botName: "Leo",                 // visitor-facing name the bot goes by (configurable)
     themeColor: "#6C5CE7",
     position: "bottom-right",       // bottom-left | bottom-right
     launcherIcon: "orb",            // orb | mic | custom url
-    greeting: "Hi! I'm here on behalf of Mohan. How can I help?"
+    greeting: "Hi, I'm Leo — here on behalf of Mohan. How can I help?"
   },
 
   behavior: {
@@ -392,6 +392,7 @@ they are trust-sensitive and must not ship to the browser.
 ```jsonc
 // KV: config:persona
 {
+  "botName": "Leo",
   "owner": { "name": "Mohan Sagar K", "role": "Software Engineer" },
   "bio": "…",
   "tone": "friendly, concise, professional",
@@ -473,15 +474,15 @@ The Worker validates config at startup; a missing secret for the active provider
 
 ## 11. Distribution (D17)
 - **GitHub:** source, MIT license, issues, `examples/`, Worker deploy guide.
-- **npm:** `portfolio-chat-widget` — ESM + UMD builds.
-- **CDN:** `https://cdn.jsdelivr.net/npm/portfolio-chat-widget/dist/portfolio-chat.min.js`.
+- **npm:** `ai-voice-bot-widget` — ESM + UMD builds.
+- **CDN:** `https://cdn.jsdelivr.net/npm/ai-voice-bot-widget/dist/ai-voice-bot.min.js`.
 - **Install (host page):**
 ```html
-<script>window.PortfolioChatConfig = { workerUrl: "https://chat.devmohan.in", /* … */ };</script>
-<script src="https://cdn.jsdelivr.net/npm/portfolio-chat-widget/dist/portfolio-chat.min.js" defer></script>
+<script>window.AiVoiceBotConfig = { workerUrl: "https://voicebot.devmohan.in", /* … */ };</script>
+<script src="https://cdn.jsdelivr.net/npm/ai-voice-bot-widget/dist/ai-voice-bot.min.js" defer></script>
 ```
 - **Install (Worker):** `wrangler secret put GROQ_API_KEY` (+ `WEBHOOK_URL`), set KV config +
-  `ALLOWED_ORIGINS`, `wrangler deploy`; map a custom route (`chat.devmohan.in`); `GET /health`
+  `ALLOWED_ORIGINS`, `wrangler deploy`; map a custom route (`voicebot.devmohan.in`); `GET /health`
   to verify.
 
 ---
@@ -507,7 +508,7 @@ The Worker validates config at startup; a missing secret for the active provider
 - Accessibility pass, `prefers-reduced-motion`, mobile QA.
 - Spam heuristics hardening; KV lead-log rotation.
 - Full test suite (Worker/agent/integration/widget/E2E via Miniflare + Playwright).
-- npm + CDN publish; `wrangler deploy` to `chat.devmohan.in`; embed on `devmohan.in`.
+- npm + CDN publish; `wrangler deploy` to `voicebot.devmohan.in`; embed on `devmohan.in`.
 - Add a paid provider entry (Anthropic Haiku) in the registry as a documented upgrade.
 
 ### Later (backlog)
