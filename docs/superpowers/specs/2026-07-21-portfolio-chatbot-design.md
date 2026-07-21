@@ -28,7 +28,8 @@ configured entirely through a `window` config object.
 
 **Core promises:**
 1. **Truly free to run.** Cloudflare Workers free tier (always-warm, no cold start, no card)
-   + free-tier LLM providers (Groq/Gemini) + browser voice. $0 hosting, $0 inference.
+   + free-tier LLM providers (Groq/Gemini) + a free neural voice (Groq PlayAI TTS) with
+   browser-voice fallback. $0 hosting, $0 inference.
 2. **Configurable, upgradeable.** Every provider, model, and key is config-driven and
    changeable at any time — swap Groq → Anthropic/OpenAI/Bedrock without redeploying code.
 3. **Secure by default.** No secret ever touches the browser. All model calls route through
@@ -57,7 +58,7 @@ configured entirely through a `window` config object.
 |---|------|----------|
 | D1 | Delivery (widget) | Vanilla JS embed — single `<script>` tag, framework-agnostic |
 | D2 | STT (listening) | Browser Web Speech API where supported; **text fallback** otherwise. Optional cloud STT via Worker (Groq Whisper over `fetch`) for Safari/Firefox parity (later) |
-| D3 | TTS (speaking) | **Hybrid** — browser TTS default (free, zero-backend); optional neural TTS via Worker (JS `edge-tts` port or REST provider e.g. ElevenLabs/Azure), configurable |
+| D3 | TTS (speaking) | **Free neural default: Groq PlayAI TTS** (REST via Worker, same key as the LLM) → one consistent branded voice on every device, $0. **Fallback: browser (system) TTS** on error/quota. **v2:** ordered multi-provider failover chain (several free-tier keys) → system voice as the always-free floor |
 | D4 | Agent framework | **LangGraph.js (TypeScript)** — stateful graph; the interview centerpiece |
 | D5 | LLM provider | **Provider registry**, config-driven. Free default **Groq / `llama-3.3-70b-versatile`** (OpenAI-compatible endpoint); Gemini wired; Anthropic/OpenAI/Bedrock addable via one entry. Changeable at any time |
 | D6 | Key security | **Worker holds all keys** (Cloudflare secrets); key never in browser |
@@ -164,7 +165,11 @@ browser. Changing the default provider or a model is a KV/secret edit — no red
     // "anthropic": { "model": "claude-haiku-4-5", "keySecret": "ANTHROPIC_API_KEY" }
     // "openai":    { "model": "gpt-4o-mini",      "keySecret": "OPENAI_API_KEY" }
   },
-  "tts": { "provider": "browser" }      // browser | edge | elevenlabs | azure | none
+  "tts": {
+    "chain": ["groq"],                  // v1: Groq PlayAI TTS (playai-tts); v2: ["groq","azure","elevenlabs"]
+    "voice": "Fritz-PlayAI",            // fixed neural voice — same on every device
+    "fallback": "browser"               // system voice = always-free floor when the chain is exhausted
+  }
 }
 ```
 
@@ -243,10 +248,19 @@ owner name/role/bio + tone + facts allowlist + hard rules:
 
 ### 4.5 Neural TTS (D3)
 
-Browser TTS is the **free, zero-backend default** (no Worker call). `/tts` is an optional
-upgrade: a JS `edge-tts` port (WebSocket to Microsoft, if Workers-compatible) or a REST
-provider (ElevenLabs/Azure, key as a Worker secret). Provider is config-driven; audio never
-persisted.
+**Free neural default: Groq PlayAI TTS.** `/tts` synthesizes each reply server-side via Groq's
+REST speech endpoint (`playai-tts`), reusing the same free `GROQ_API_KEY` as the LLM — one
+fixed voice, identical on every laptop and phone, $0. Plain `fetch` (no WebSocket), so it fits
+the Worker cleanly.
+
+**Fallback order (v1):** Groq TTS → **browser (system) TTS** if Groq errors or hits its
+free-tier rate/quota limit → text-only if the browser has no voice. The instant system voice
+is always the zero-latency floor.
+
+**Failover chain (v2, backlog):** `tts.chain` becomes an ordered list of neural providers,
+each with its own key (Groq → e.g. Azure F0 → ElevenLabs → …). When one returns a
+quota/rate-limit error the Worker advances to the next; the browser system voice remains the
+final always-free floor. Provider config lives in KV (runtime-editable); audio never persisted.
 
 ### 4.6 Worker module structure (planned)
 
@@ -486,7 +500,8 @@ The Worker validates config at startup; a missing secret for the active provider
 - Voice-first orb: browser STT + TTS, text fallback, consent gate.
 - Durable Object checkpointer (per-session memory), returning-visitor greeting.
 - Origin allowlist + rate limit + abuse caps.
-- Optional neural TTS via `/tts` (REST provider or edge-tts JS port).
+- Neural TTS via `/tts`: **Groq PlayAI TTS** (free, same key) as the default voice →
+  **browser system-voice fallback** on error/quota.
 
 ### v0.3 — polish, publish, ship
 - Accessibility pass, `prefers-reduced-motion`, mobile QA.
@@ -497,7 +512,8 @@ The Worker validates config at startup; a missing secret for the active provider
 
 ### Later (backlog)
 - Cloud STT via `/stt` (Groq Whisper) for Safari/Firefox parity.
-- ElevenLabs/Azure neural TTS adapters; sentence-chunked TTS synced to token stream.
+- **Multi-provider TTS failover chain** (several free-tier keys: Groq → Azure F0 → ElevenLabs
+  → system voice as the always-free floor); sentence-chunked TTS synced to token stream.
 - React wrapper; WordPress example.
 - Conversation summary emailed alongside the lead.
 
@@ -510,7 +526,7 @@ The Worker validates config at startup; a missing secret for the active provider
 | R1 | Worker bundle-size limit (~3 MB gz free) | Call Groq via lean OpenAI-compatible `fetch`; import only needed `@langchain/*` subpaths; verify with `--dry-run`. Fallback: minimal custom graph if LangGraph.js is too heavy |
 | R2 | Worker CPU-time budget | LLM/webhook calls are awaited I/O (don't count against CPU); orchestration is light — verify under load |
 | R3 | Durable Objects free-tier limits | Confirm SQLite-backed DO is within the free plan for expected traffic; Workers KV is the simpler fallback for session state |
-| R4 | Free neural TTS in a Worker | `edge-tts` is Python; browser TTS covers the free path. Neural = optional: JS edge port (WebSocket) or REST provider (key). Mark as v0.2/backlog |
+| R4 | Groq TTS free-tier limits | Groq PlayAI TTS (REST, same free key) is the default neural voice and fits the Worker cleanly. Risk is Groq TTS rate/quota limits → automatic fallback to the browser system voice (v1); v2 adds a multi-provider free-tier failover chain before the system-voice floor |
 | R5 | iOS Safari autoplay/mic restrictions | Voice must start on user gesture (orb tap); documented |
 | R6 | Prompt injection ("ignore your rules") | Guardrail node + facts allowlist + refusal; explicit tests |
 | R7 | Free-tier LLM rate limits (Groq/Gemini) | Abuse caps keep usage low; registry lets you upgrade to paid instantly |
