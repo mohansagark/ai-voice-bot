@@ -70,4 +70,14 @@ describe("/chat", () => {
     const res = await app.fetch(chatReq({ messages: many }), allowed);
     expect(res.status).toBe(429);
   });
+
+  it("returns a 502 JSON error (with CORS) when the model call fails", async () => {
+    const throwingModel = { bindTools: () => ({ invoke: async () => { throw new Error("groq timeout"); } }) };
+    const deps = { buildModel: (() => throwingModel) as unknown as typeof buildModel };
+    const res = await createApp(deps).fetch(chatReq({ messages: [{ role: "user", content: "hi" }] }), allowed);
+    expect(res.status).toBe(502);
+    expect(res.headers.get("access-control-allow-origin")).toBe("https://devmohan.in");
+    const body = await res.json() as any;
+    expect(typeof body.reply).toBe("string");
+  });
 });

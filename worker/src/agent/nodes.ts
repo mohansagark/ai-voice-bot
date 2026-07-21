@@ -96,7 +96,7 @@ export function makeConfirmNode(deps: AgentDeps) {
     const name = state.lead.name ?? "there";
     return {
       messages: [new AIMessage(
-        `Thanks, ${name}! I've passed your message along to ${deps.persona.owner.name}. He'll reach out at the email you gave.`,
+        `Thanks, ${name}! I've passed your message along to ${deps.persona.owner.name}, who will reach out at the email you gave.`,
       )],
     };
   };

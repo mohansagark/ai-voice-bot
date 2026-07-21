@@ -50,23 +50,30 @@ export function createApp(deps: Deps = { buildModel }) {
           return Response.json({ error: "message too long" }, { status: 413, headers: cors });
         }
 
-        let model;
+        let model: ReturnType<typeof deps.buildModel>;
         try { model = deps.buildModel(config, env); }
         catch (e) { return Response.json({ error: String((e as Error).message) }, { status: 500, headers: cors }); }
 
-        const graph = buildGraph({ model, persona: config.persona, webhookUrl: env.WEBHOOK_URL || "" });
-        const lcMessages = body.messages.map((m) =>
-          m.role === "assistant" ? new AIMessage(m.content) : new HumanMessage(m.content));
-        const result = await graph.invoke({
-          messages: lcMessages,
-          consent: body.consent ?? { agreed: false },
-        });
-        const out = result.messages[result.messages.length - 1];
-        const reply = typeof out?.content === "string" ? out.content : "";
-        return Response.json(
-          { reply, lead_saved: result.leadSaved, lead: result.leadSaved ? result.lead : null },
-          { headers: cors },
-        );
+        try {
+          const graph = buildGraph({ model, persona: config.persona, webhookUrl: env.WEBHOOK_URL || "" });
+          const lcMessages = body.messages.map((m) =>
+            m.role === "assistant" ? new AIMessage(m.content) : new HumanMessage(m.content));
+          const result = await graph.invoke({
+            messages: lcMessages,
+            consent: body.consent ?? { agreed: false },
+          });
+          const out = result.messages[result.messages.length - 1];
+          const reply = typeof out?.content === "string" ? out.content : "";
+          return Response.json(
+            { reply, lead_saved: result.leadSaved, lead: result.leadSaved ? result.lead : null },
+            { headers: cors },
+          );
+        } catch (e) {
+          return Response.json(
+            { error: String((e as Error).message), reply: "Sorry, something went wrong on my end. Please try again." },
+            { status: 502, headers: cors },
+          );
+        }
       }
 
       return new Response("Not found", { status: 404, headers: cors });

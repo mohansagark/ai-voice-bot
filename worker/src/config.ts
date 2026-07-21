@@ -46,7 +46,8 @@ export const providers: Record<string, ProviderConfig> = {
     baseURL: "https://api.groq.com/openai/v1",
     keyEnv: "GROQ_API_KEY",
   },
-  gemini: { model: "gemini-2.0-flash", keyEnv: "GEMINI_API_KEY" },
+  // Google's OpenAI-compatible endpoint, so buildModel's ChatOpenAI client can target Gemini.
+  gemini: { model: "gemini-2.0-flash", baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/", keyEnv: "GEMINI_API_KEY" },
 };
 
 export function loadConfig(env: Env): AppConfig {
