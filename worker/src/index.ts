@@ -45,8 +45,8 @@ export function createApp(deps: Deps = { buildModel }) {
         if (body.messages.length > config.maxTurnsPerSession) {
           return Response.json({ error: "too many turns" }, { status: 429, headers: cors });
         }
-        const lastUser = body.messages[body.messages.length - 1];
-        if ((lastUser?.content?.length ?? 0) > config.maxMessageChars) {
+        const lastMessage = body.messages[body.messages.length - 1];
+        if ((lastMessage?.content?.length ?? 0) > config.maxMessageChars) {
           return Response.json({ error: "message too long" }, { status: 413, headers: cors });
         }
 

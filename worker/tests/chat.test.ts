@@ -63,4 +63,11 @@ describe("/chat", () => {
     const res = await app.fetch(chatReq({ messages: [] }), allowed);
     expect(res.status).toBe(400);
   });
+
+  it("rejects too many turns with 429", async () => {
+    const app = createApp(fakeDeps(new AIMessage("hi")));
+    const many = Array.from({ length: 31 }, (_, i) => ({ role: "user", content: `m${i}` }));
+    const res = await app.fetch(chatReq({ messages: many }), allowed);
+    expect(res.status).toBe(429);
+  });
 });
