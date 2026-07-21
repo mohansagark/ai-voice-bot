@@ -14,8 +14,8 @@ describe("isValidEmail", () => {
 
 describe("postLead", () => {
   it("POSTs JSON to the webhook and returns ok on 200", async () => {
-    const fake = vi.fn(async () => new Response("ok", { status: 200 }));
-    const res = await postLead("https://hook.test/x", payload, fake as any);
+    const fake = vi.fn<typeof fetch>(async () => new Response("ok", { status: 200 }));
+    const res = await postLead("https://hook.test/x", payload, fake);
     expect(res).toEqual({ ok: true, status: 200 });
     expect(fake).toHaveBeenCalledOnce();
     const [, init] = fake.mock.calls[0];
