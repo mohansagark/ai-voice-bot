@@ -1,0 +1,10 @@
+name = "ai-voice-bot"
+main = "src/index.ts"
+compatibility_date = "2024-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ALLOWED_ORIGINS = ""
+DEFAULT_PROVIDER = "groq"
+MAX_MESSAGE_CHARS = "2000"
+MAX_TURNS_PER_SESSION = "30"
