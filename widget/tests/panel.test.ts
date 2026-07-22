@@ -55,4 +55,12 @@ describe("wirePanel", () => {
     expect(box.querySelector("a")).toBeNull();            // javascript: url was dropped (no anchor)
     expect(box.textContent).toContain("<img");            // rendered as literal text
   });
+
+  it("startBotText renders a one-shot bot line", () => {
+    const refs = mountShell(cfg);
+    const p = wirePanel(refs);
+    p.startBotText("Hi");
+    const bot = refs.list.querySelector(".msg.bot")!;
+    expect(bot.textContent).toBe("Hi");
+  });
 });

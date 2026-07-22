@@ -13,8 +13,9 @@ export function wirePanel(refs: Refs) {
   return {
     addUser: (text: string) => void line("user", text),
     startBot: (): HTMLElement => line("bot", ""),
+    startBotText: (text: string) => void line("bot", text),
     appendBot: (el: HTMLElement, text: string) => { el.textContent = (el.textContent ?? "") + text; scroll(); },
-    endBot: (el: HTMLElement) => { if (!el.textContent) el.textContent = "…"; scroll(); },
+    endBot: (el: HTMLElement, finalText?: string) => { if (finalText) el.textContent = finalText; else if (!el.textContent) el.textContent = "…"; scroll(); },
     note: (text: string) => void line("note", text),
     showError: () => void line("bot", "Hmm, something hiccuped — mind trying that again?"),
     onSubmit: (handler: (text: string) => void) => {
