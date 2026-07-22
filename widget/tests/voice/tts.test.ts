@@ -67,4 +67,41 @@ describe("createSpeaker", () => {
     expect(audio.paused).toBe(true);
     expect(cancelled).toEqual([true]);
   });
+
+  it("never throws/rejects when the injected synth.speak() itself throws, and settles at idle", async () => {
+    const states: string[] = [];
+    const synth = {
+      speak: () => { throw new Error("synth exploded"); },
+      cancel: () => {},
+    };
+    const fetchImpl = (async () => new Response("bad", { status: 502 })) as unknown as typeof fetch;
+    const speaker = createSpeaker(cfg, {
+      fetchImpl,
+      synth,
+      makeUtterance: (text, lang) => ({ text, lang, onend: null } as any),
+    });
+    speaker.onState((s) => states.push(s));
+    await expect(speaker.speak("Hi there")).resolves.toBeUndefined();
+    expect(states[states.length - 1]).toBe("idle");
+  });
+
+  it("only falls back once when audio.onerror fires AND play() rejects for the same call", async () => {
+    const spoken: string[] = [];
+    const synth = { speak: (u: { lang: string }) => { spoken.push(u.lang); }, cancel: () => {} };
+    const audio = {
+      onended: null as (() => void) | null,
+      onerror: null as ((e?: unknown) => void) | null,
+      play: async () => { audio.onerror?.(); throw new Error("playback failed"); },
+      pause: () => {},
+    };
+    const fetchImpl = (async () => new Response("bytes", { status: 200 })) as unknown as typeof fetch;
+    const speaker = createSpeaker(cfg, {
+      fetchImpl,
+      synth,
+      makeAudio: () => audio,
+      makeUtterance: (text, lang) => ({ text, lang, onend: null } as any),
+    });
+    await speaker.speak("Hi there");
+    expect(spoken).toEqual(["en-US"]);
+  });
 });

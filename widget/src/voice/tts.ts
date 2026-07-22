@@ -28,35 +28,51 @@ export function createSpeaker(cfg: SpeakerConfig, deps: SpeakerDeps = {}): Speak
   let currentAudio: AudioLike | null = null;
   const setState = (s: SpeakState) => stateCb?.(s);
 
+  // Never throws: safe to call from a try block, a catch block, or a bare
+  // event-handler callback (audio.onerror) regardless of what synth/utterance
+  // dependency was injected.
   const speakBrowser = (text: string) => {
-    if (!deps.synth) return;
-    const utter: UtteranceLike = deps.makeUtterance
-      ? deps.makeUtterance(text, cfg.lang)
-      : (Object.assign(new SpeechSynthesisUtterance(text), { lang: cfg.lang }) as unknown as UtteranceLike);
-    utter.onend = () => setState("idle");
-    setState("speaking");
-    deps.synth.speak(utter);
+    try {
+      if (!deps.synth) return;
+      const utter: UtteranceLike = deps.makeUtterance
+        ? deps.makeUtterance(text, cfg.lang)
+        : (Object.assign(new SpeechSynthesisUtterance(text), { lang: cfg.lang }) as unknown as UtteranceLike);
+      utter.onend = () => setState("idle");
+      setState("speaking");
+      deps.synth.speak(utter);
+    } catch {
+      setState("idle");
+    }
   };
 
   return {
     async speak(text: string): Promise<void> {
+      // A real playback error commonly fires BOTH audio.onerror AND rejects
+      // the play() promise for the same failure; this guard ensures the
+      // fallback only ever runs once per speak() call.
+      let fellBack = false;
+      const fallback = () => {
+        if (fellBack) return;
+        fellBack = true;
+        speakBrowser(text);
+      };
       try {
         const res = await fetchImpl(`${cfg.workerUrl}/tts`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ text, voice: cfg.voice }),
         });
-        if (!res.ok) { speakBrowser(text); return; }
+        if (!res.ok) { fallback(); return; }
         const audio = deps.makeAudio
           ? await deps.makeAudio(res)
           : (new Audio(URL.createObjectURL(await res.blob())) as unknown as AudioLike);
         currentAudio = audio;
         audio.onended = () => setState("idle");
-        audio.onerror = () => { setState("idle"); speakBrowser(text); };
+        audio.onerror = () => { setState("idle"); fallback(); };
         setState("speaking");
         await audio.play();
       } catch {
-        speakBrowser(text);
+        fallback();
       }
     },
     stop(): void {
