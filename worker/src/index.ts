@@ -1,13 +1,28 @@
 import { loadConfig, type Env, type AppConfig, type Consent } from "./config";
 import { buildModel } from "./providers";
 import { buildGraph } from "./agent/graph";
-import { HumanMessage, AIMessage } from "@langchain/core/messages";
+import { HumanMessage } from "@langchain/core/messages";
+import { serializeMessages, deserializeMessages } from "./agent/serialize";
+import type { SessionState } from "./session-store";
+import { SessionDO } from "./session-do";
+import { streamChatSSE, makeGraphRunner, type GraphRunner, type GraphFinal } from "./stream";
 
-// Wrangler requires Durable Object classes referenced in wrangler.toml bindings
-// to be exported from the entrypoint module so the bundler can locate them.
-export { SessionDO } from "./session-do";
+export interface SessionHandle {
+  load(): Promise<SessionState>;
+  save(state: SessionState): Promise<void>;
+}
 
-export interface Deps { buildModel: typeof buildModel; }
+// Default session accessor: a Durable Object per session_id (RPC methods load/save).
+function doGetSession(env: Env, sessionId: string): SessionHandle {
+  const stub = env.SESSION_DO.get(env.SESSION_DO.idFromName(sessionId)) as unknown as SessionHandle;
+  return { load: () => stub.load(), save: (s) => stub.save(s) };
+}
+
+export interface Deps {
+  buildModel: typeof buildModel;
+  getSession: (env: Env, sessionId: string) => SessionHandle;
+  makeRunner: (graph: ReturnType<typeof buildGraph>) => GraphRunner;
+}
 
 function corsHeaders(origin: string, allowed: string[]): Record<string, string> {
   const ok = allowed.length === 0 || allowed.includes(origin);
@@ -18,9 +33,11 @@ function corsHeaders(origin: string, allowed: string[]): Record<string, string> 
   };
 }
 
-interface ChatBody { messages?: { role: string; content: string }[]; consent?: Consent; }
+interface ChatBody { session_id?: string; message?: string; consent?: Consent; }
 
-export function createApp(deps: Deps = { buildModel }) {
+export function createApp(
+  deps: Deps = { buildModel, getSession: doGetSession, makeRunner: makeGraphRunner },
+) {
   return {
     async fetch(request: Request, env: Env): Promise<Response> {
       const url = new URL(request.url);
@@ -43,41 +60,42 @@ export function createApp(deps: Deps = { buildModel }) {
           return Response.json({ error: "origin not allowed" }, { status: 403, headers: cors });
         }
         const body = (await request.json().catch(() => null)) as ChatBody | null;
-        if (!body?.messages?.length) {
-          return Response.json({ error: "messages required" }, { status: 400, headers: cors });
+        if (!body?.session_id || !body?.message) {
+          return Response.json({ error: "session_id and message are required" }, { status: 400, headers: cors });
         }
-        if (body.messages.length > config.maxTurnsPerSession) {
-          return Response.json({ error: "too many turns" }, { status: 429, headers: cors });
-        }
-        const lastMessage = body.messages[body.messages.length - 1];
-        if ((lastMessage?.content?.length ?? 0) > config.maxMessageChars) {
+        if (body.message.length > config.maxMessageChars) {
           return Response.json({ error: "message too long" }, { status: 413, headers: cors });
         }
 
-        let model: ReturnType<typeof deps.buildModel>;
+        const handle = deps.getSession(env, body.session_id);
+        let state: SessionState;
+        try { state = await handle.load(); }
+        catch (e) { return Response.json({ error: String((e as Error).message) }, { status: 500, headers: cors }); }
+
+        if (state.turns + 1 > config.maxTurnsPerSession) {
+          return Response.json({ error: "too many turns" }, { status: 429, headers: cors });
+        }
+        const turns = state.turns + 1;
+
+        let model;
         try { model = deps.buildModel(config, env); }
         catch (e) { return Response.json({ error: String((e as Error).message) }, { status: 500, headers: cors }); }
 
-        try {
-          const graph = buildGraph({ model, persona: config.persona, webhookUrl: env.WEBHOOK_URL || "" });
-          const lcMessages = body.messages.map((m) =>
-            m.role === "assistant" ? new AIMessage(m.content) : new HumanMessage(m.content));
-          const result = await graph.invoke({
-            messages: lcMessages,
-            consent: body.consent ?? { agreed: false },
+        const graph = buildGraph({ model, persona: config.persona, webhookUrl: env.WEBHOOK_URL || "" });
+        const history = deserializeMessages(state.messages);
+        const messages = [...history, new HumanMessage(body.message)];
+        const run = deps.makeRunner(graph)(messages, body.consent ?? { agreed: false });
+
+        const persist = async (f: GraphFinal): Promise<void> => {
+          await handle.save({
+            messages: serializeMessages(f.messages),
+            lead: f.leadSaved ? f.lead : state.lead,          // sticky: keep prior lead if none saved this turn
+            leadSaved: state.leadSaved || f.leadSaved,          // sticky across the session
+            turns,
           });
-          const out = result.messages[result.messages.length - 1];
-          const reply = typeof out?.content === "string" ? out.content : "";
-          return Response.json(
-            { reply, lead_saved: result.leadSaved, lead: result.leadSaved ? result.lead : null },
-            { headers: cors },
-          );
-        } catch (e) {
-          return Response.json(
-            { error: String((e as Error).message), reply: "Sorry, something went wrong on my end. Please try again." },
-            { status: 502, headers: cors },
-          );
-        }
+        };
+
+        return streamChatSSE(run, cors, persist);
       }
 
       return new Response("Not found", { status: 404, headers: cors });
@@ -85,4 +103,5 @@ export function createApp(deps: Deps = { buildModel }) {
   };
 }
 
+export { SessionDO };
 export default createApp();
