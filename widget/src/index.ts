@@ -21,6 +21,7 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
   const refs = mountShell(cfg);
   const panel = wirePanel(refs);
   let greeted = false;
+  let consentPending = false;
 
   const orb = wireOrb(refs, (open) => {
     if (open) {
@@ -45,7 +46,7 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
         onToken: (t) => panel.appendBot(line, t),
         onLead: (lead) => {
           const nm = (lead as { name?: string })?.name;
-          if (nm && cfg.behavior.rememberReturning) session.setName(nm.split(" ")[0]);
+          if (nm && typeof nm === "string" && cfg.behavior.rememberReturning) session.setName(nm.split(" ")[0]);
           panel.note("✓ sent to Mohan");
           emit(analytics, "lead", lead);
         },
@@ -59,8 +60,9 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
 
   panel.onSubmit((text: string) => {
     if (session.consent()) { send(text); return; }
-    // First message: gate on consent, then send.
-    panel.showConsent(cfg, () => { session.setConsent(cfg.privacy.consentText); send(text); });
+    if (consentPending) return;            // a gate is already up — ignore further submits
+    consentPending = true;
+    panel.showConsent(cfg, () => { consentPending = false; session.setConsent(cfg.privacy.consentText); send(text); });
   });
 
   return { refs };

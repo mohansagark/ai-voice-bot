@@ -43,4 +43,17 @@ describe("mount", () => {
     app.refs.orb.click();
     expect(app.refs.list.textContent).toContain("Welcome back, Alex");
   });
+
+  it("stores the visitor's first name and shows a note on a lead event", async () => {
+    const store = memoryStore();
+    const fetchImpl = (async () => streamRes([sse("lead", { lead: { name: "Alex Rivera" } }), sse("done", { reply: "Thanks!", lead_saved: true })])) as unknown as typeof fetch;
+    const app = mount(baseCfg, { store, fetchImpl })!;
+    app.refs.orb.click();
+    app.refs.input.value = "hi";
+    app.refs.form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    (app.refs.list.querySelector(".consent button") as HTMLButtonElement).click(); // agree -> sends
+    await new Promise((r) => setTimeout(r, 0));
+    expect(store.get("avb_name")).toBe("Alex");
+    expect(app.refs.list.textContent).toContain("✓ sent");
+  });
 });
