@@ -9,7 +9,7 @@ export interface ChatModelLike {
 export function buildModel(config: AppConfig, env: Env, provider = config.defaultProvider): ChatModelLike {
   const p = config.providers[provider];
   if (!p) throw new Error(`Unknown provider: ${provider}`);
-  const apiKey = (env as Record<string, string | undefined>)[p.keyEnv];
+  const apiKey = (env as unknown as Record<string, string | undefined>)[p.keyEnv];
   if (!apiKey) throw new Error(`Missing key for provider "${provider}" (env ${p.keyEnv})`);
   return new ChatOpenAI({
     model: p.model,

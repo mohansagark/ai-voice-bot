@@ -26,6 +26,7 @@ export interface Env {
   DEFAULT_PROVIDER?: string;
   MAX_MESSAGE_CHARS?: string;
   MAX_TURNS_PER_SESSION?: string;
+  SESSION_DO: DurableObjectNamespace;
 }
 
 export const defaultPersona: Persona = {

@@ -4,7 +4,7 @@ import type { Env } from "../src/config";
 import { buildModel } from "../src/providers";
 import { AIMessage } from "@langchain/core/messages";
 
-const env: Env = { GROQ_API_KEY: "x", WEBHOOK_URL: "https://hook.test/x", ALLOWED_ORIGINS: "https://devmohan.in" };
+const env = { GROQ_API_KEY: "x", WEBHOOK_URL: "https://hook.test/x", ALLOWED_ORIGINS: "https://devmohan.in" } as Env;
 
 describe("/health", () => {
   it("reports ok with the active provider", async () => {
@@ -23,7 +23,7 @@ function fakeDeps(reply: AIMessage) {
   const model = { bindTools: () => ({ invoke: async () => reply }) };
   return { buildModel: (() => model) as unknown as typeof buildModel };
 }
-const allowed: Env = { GROQ_API_KEY: "x", WEBHOOK_URL: "https://hook.test/x", ALLOWED_ORIGINS: "https://devmohan.in" };
+const allowed = { GROQ_API_KEY: "x", WEBHOOK_URL: "https://hook.test/x", ALLOWED_ORIGINS: "https://devmohan.in" } as Env;
 const origin = { headers: { origin: "https://devmohan.in", "content-type": "application/json" } };
 
 function chatReq(body: unknown) {

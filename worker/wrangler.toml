@@ -8,3 +8,12 @@ ALLOWED_ORIGINS = ""
 DEFAULT_PROVIDER = "groq"
 MAX_MESSAGE_CHARS = "2000"
 MAX_TURNS_PER_SESSION = "30"
+
+[[durable_objects.bindings]]
+name = "SESSION_DO"
+class_name = "SessionDO"
+
+# SQLite-backed DO => eligible on the Cloudflare free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SessionDO"]

@@ -3,6 +3,10 @@ import { buildModel } from "./providers";
 import { buildGraph } from "./agent/graph";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 
+// Wrangler requires Durable Object classes referenced in wrangler.toml bindings
+// to be exported from the entrypoint module so the bundler can locate them.
+export { SessionDO } from "./session-do";
+
 export interface Deps { buildModel: typeof buildModel; }
 
 function corsHeaders(origin: string, allowed: string[]): Record<string, string> {
