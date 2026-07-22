@@ -13,59 +13,64 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
   const cfg: WidgetConfig | null = validateConfig(rawConfig);
   if (!cfg) return null;
 
-  const store = deps.store ?? safeStore();
-  const fetchImpl = deps.fetchImpl ?? fetch;
-  const session = createSession(store);
-  const analytics = cfg.advanced.analyticsCallback;
+  try {
+    const store = deps.store ?? safeStore();
+    const fetchImpl = deps.fetchImpl ?? fetch;
+    const session = createSession(store);
+    const analytics = cfg.advanced.analyticsCallback;
 
-  const refs = mountShell(cfg);
-  const panel = wirePanel(refs);
-  let greeted = false;
-  let consentPending = false;
+    const refs = mountShell(cfg);
+    const panel = wirePanel(refs);
+    let greeted = false;
+    let consentPending = false;
 
-  const orb = wireOrb(refs, (open) => {
-    if (open) {
-      emit(analytics, "open");
-      if (!greeted && cfg.behavior.autoGreet) {
-        const name = cfg.behavior.rememberReturning ? session.name() : null;
-        panel.startBotText(name ? `Welcome back, ${name}! What can I help with?` : cfg.branding.greeting);
-        greeted = true;
+    const orb = wireOrb(refs, (open) => {
+      if (open) {
+        emit(analytics, "open");
+        if (!greeted && cfg.behavior.autoGreet) {
+          const name = cfg.behavior.rememberReturning ? session.name() : null;
+          panel.startBotText(name ? `Welcome back, ${name}! What can I help with?` : cfg.branding.greeting);
+          greeted = true;
+        }
       }
-    }
-  });
+    });
 
-  const send = (text: string) => {
-    emit(analytics, "message", { text });
-    panel.addUser(text);
-    orb.setThinking(true);
-    const line = panel.startBot();
-    sendChat(
-      cfg.workerUrl,
-      { session_id: session.id(), message: text, consent: session.consent() ?? { agreed: false } },
-      {
-        onToken: (t) => panel.appendBot(line, t),
-        onLead: (lead) => {
-          const nm = (lead as { name?: string })?.name;
-          if (nm && typeof nm === "string" && cfg.behavior.rememberReturning) session.setName(nm.split(" ")[0]);
-          panel.note("✓ sent to Mohan");
-          emit(analytics, "lead", lead);
+    const send = (text: string) => {
+      emit(analytics, "message", { text });
+      panel.addUser(text);
+      orb.setThinking(true);
+      const line = panel.startBot();
+      sendChat(
+        cfg.workerUrl,
+        { session_id: session.id(), message: text, consent: session.consent() ?? { agreed: false } },
+        {
+          onToken: (t) => panel.appendBot(line, t),
+          onLead: (lead) => {
+            const nm = (lead as { name?: string })?.name;
+            if (nm && typeof nm === "string" && cfg.behavior.rememberReturning) session.setName(nm.split(" ")[0]);
+            panel.note("✓ sent to Mohan");
+            emit(analytics, "lead", lead);
+          },
+          onDone: (reply) => { panel.endBot(line, reply); orb.setThinking(false); },
+          onError: () => { line.remove(); panel.showError(); orb.setThinking(false); emit(analytics, "error"); },
+          onBlocked: () => { line.remove(); orb.setThinking(false); emit(analytics, "blocked"); },
         },
-        onDone: (reply) => { panel.endBot(line, reply); orb.setThinking(false); },
-        onError: () => { line.remove(); panel.showError(); orb.setThinking(false); emit(analytics, "error"); },
-        onBlocked: () => { line.remove(); orb.setThinking(false); emit(analytics, "blocked"); },
-      },
-      fetchImpl,
-    );
-  };
+        fetchImpl,
+      );
+    };
 
-  panel.onSubmit((text: string) => {
-    if (session.consent()) { send(text); return; }
-    if (consentPending) return;            // a gate is already up — ignore further submits
-    consentPending = true;
-    panel.showConsent(cfg, () => { consentPending = false; session.setConsent(cfg.privacy.consentText); send(text); });
-  });
+    panel.onSubmit((text: string) => {
+      if (session.consent()) { send(text); return; }
+      if (consentPending) return;            // a gate is already up — ignore further submits
+      consentPending = true;
+      panel.showConsent(cfg, () => { consentPending = false; session.setConsent(cfg.privacy.consentText); send(text); });
+    });
 
-  return { refs };
+    return { refs };
+  } catch (e) {
+    console.error("[ai-voice-bot]", e);
+    return null;
+  }
 }
 
 // Auto-mount on load (skipped under test, which imports `mount` directly).

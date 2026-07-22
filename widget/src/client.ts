@@ -47,6 +47,13 @@ export async function sendChat(
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
+  const dispatch = (f: { event: string; data: string }) => {
+    const payload = JSON.parse(f.data);
+    if (f.event === "token") events.onToken(payload.text);
+    else if (f.event === "lead") events.onLead(payload.lead);
+    else if (f.event === "done") events.onDone(payload.reply, !!payload.lead_saved);
+    else if (f.event === "error") events.onError(payload.message);
+  };
   try {
     for (;;) {
       const { value, done } = await reader.read();
@@ -54,13 +61,12 @@ export async function sendChat(
       buf += dec.decode(value, { stream: true });
       const { frames, rest } = parseSSE(buf);
       buf = rest;
-      for (const f of frames) {
-        const payload = JSON.parse(f.data);
-        if (f.event === "token") events.onToken(payload.text);
-        else if (f.event === "lead") events.onLead(payload.lead);
-        else if (f.event === "done") events.onDone(payload.reply, !!payload.lead_saved);
-        else if (f.event === "error") events.onError(payload.message);
-      }
+      for (const f of frames) dispatch(f);
+    }
+    // Flush a trailing frame that wasn't terminated by a final `\n\n`.
+    if (buf.trim()) {
+      const { frames } = parseSSE(buf + "\n\n");
+      for (const f of frames) dispatch(f);
     }
   } catch (e) {
     events.onError(String((e as Error).message));

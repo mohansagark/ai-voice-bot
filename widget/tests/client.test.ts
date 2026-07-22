@@ -49,4 +49,12 @@ describe("sendChat", () => {
     await sendChat("https://w.test", { session_id: "s", message: "hi", consent: {} }, events, fake);
     expect(log[0]).toMatch(/^error:/);
   });
+
+  it("dispatches onError for an error frame", async () => {
+    const body = streamOf([sse("error", { message: "boom" })]);
+    const fake = (async () => new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } })) as unknown as typeof fetch;
+    const { log, events } = collector();
+    await sendChat("https://w.test", { session_id: "s", message: "hi", consent: {} }, events, fake);
+    expect(log).toEqual(["error:boom"]);
+  });
 });
