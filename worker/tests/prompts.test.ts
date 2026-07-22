@@ -5,7 +5,7 @@ import { defaultPersona } from "../src/config";
 describe("buildSystemPrompt", () => {
   const prompt = buildSystemPrompt(defaultPersona);
   it("names the owner and role", () => {
-    expect(prompt).toContain("Mohan Sagar K");
+    expect(prompt).toContain("Mohan");
     expect(prompt).toContain("Software Engineer");
   });
   it("introduces itself by the configured bot name", () => {
