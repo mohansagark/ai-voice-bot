@@ -44,4 +44,21 @@ describe("session", () => {
     expect(() => createSession(store).consent()).not.toThrow();
     expect(createSession(store).consent()).toBeNull();
   });
+
+  it("persists the sound-toggle preference, defaulting when unset", () => {
+    const store = memoryStore();
+    const s = createSession(store);
+    expect(s.soundOn(false)).toBe(false);
+    expect(s.soundOn(true)).toBe(true);
+    s.setSoundOn(true);
+    expect(createSession(store).soundOn(false)).toBe(true);
+  });
+
+  it("forget() also clears the sound preference", () => {
+    const store = memoryStore();
+    const s = createSession(store);
+    s.setSoundOn(true);
+    s.forget();
+    expect(s.soundOn(false)).toBe(false);
+  });
 });
