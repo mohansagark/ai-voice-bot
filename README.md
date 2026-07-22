@@ -1,20 +1,59 @@
 # AI Voice Bot
 
-Agentic voice greeter for a portfolio site — LangGraph.js in a Cloudflare Worker.
-See `docs/superpowers/specs/` for the full design.
+Leo — an agentic voice/chat greeter for a portfolio site. A LangGraph.js agent running on a
+Cloudflare Worker, fronted by a zero-dependency, Shadow-DOM-isolated embeddable widget with
+tap-to-talk voice input and neural voice replies.
 
-## Worker (v0.1) — local dev
+See `docs/superpowers/specs/` for the full design docs and `docs/superpowers/plans/` for the
+implementation plans (this project was built spec → plan → TDD implementation, one slice at a
+time).
 
+## What's here
+
+- **`worker/`** — the backend: a Cloudflare Worker exposing `POST /chat` (SSE-streamed LangGraph
+  agent replies, session memory via Durable Objects, spam/rate guards, lead capture) and
+  `POST /tts` (Groq neural text-to-speech). See `worker/` for local dev/test commands.
+- **`widget/`** — the frontend: a self-mounting, embeddable chat widget (`<script>` tag, zero
+  runtime deps, ~5.5 KB gzipped) that renders inside a Shadow DOM so it can't be affected by —
+  or leak into — a host page's styles. See [`widget/README.md`](widget/README.md) for build,
+  test, and embed instructions.
+
+## Features by version
+
+| Version | What it adds |
+|---|---|
+| v0.1 | The agent + backend: streaming chat, session memory, spam/rate guards, lead capture to a webhook. |
+| v0.2a | Backend streaming + memory hardening (dev/prod mode switch, operational guards). |
+| v0.2b | The embeddable widget: Shadow DOM shell, orb + chat panel, SSE streaming client, consent gate, session/name persistence. |
+| v0.2c | **Voice**: tap-to-talk mic (browser `SpeechRecognition`) and spoken replies (Groq neural TTS → browser `speechSynthesis` → silent fallback), with a mute toggle and calm, opt-in voice UX. |
+| v0.3 (next) | npm/CDN publish + deploy to `voicebot.devmohan.in` + embed on `devmohan.in`. |
+
+## Quickstart
+
+**1. Run the backend:**
 ```bash
 cd worker
 npm install
 cp .dev.vars.example .dev.vars   # add your free GROQ_API_KEY and a WEBHOOK_URL
-npm test                          # unit + integration tests (offline, fake model)
-npm run dev                       # wrangler dev on http://localhost:8787
+npm test                         # unit + integration tests (offline, fake model)
+npm run dev                      # wrangler dev on http://localhost:8787
 ```
+Add `MODE=dev` to `worker/.dev.vars` to bypass the origin/rate/spam guards while testing locally.
+Get a free Groq key at [console.groq.com](https://console.groq.com); a free lead webhook at
+[formspree.io](https://formspree.io). To hear Leo's neural voice, also accept the `playai-tts`
+model's terms once in the Groq console (see [`widget/README.md`](widget/README.md#voice-v02c) —
+without it, `/tts` fails gracefully and the widget falls back to browser text-to-speech).
 
-Then open `widget/demo.html` in a browser and chat. Get a free Groq key at
-console.groq.com; a free webhook at formspree.io.
+**2. Build and open the widget:**
+```bash
+cd widget
+npm install
+npm test           # unit tests (config, SSE client, session, voice, DOM via happy-dom)
+npm run build      # -> dist/ai-voice-bot.min.js
+```
+Open `widget/demo-embed.html` in a browser (with the Worker running from step 1) to chat with
+Leo — type or tap the mic — and prove the widget survives the demo page's deliberately hostile
+CSS via Shadow DOM isolation.
 
-Set `ALLOWED_ORIGINS` (CSV) in `wrangler.toml` for production; for local demo via
-`file://` leave it empty (all origins allowed).
+Set `ALLOWED_ORIGINS` (CSV) in `worker/wrangler.toml` for production; for local dev leave it
+empty (all origins allowed) or set `MODE=dev`.
