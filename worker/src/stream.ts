@@ -16,7 +16,11 @@ export interface GraphStreamRun {
   tokens: AsyncIterable<string>;
   final: Promise<GraphFinal>;
 }
-export type GraphRunner = (messages: BaseMessage[], consent: unknown) => GraphStreamRun;
+export type GraphRunner = (
+  messages: BaseMessage[],
+  consent: unknown,
+  session?: { leadSaved: boolean; lead: Lead },
+) => GraphStreamRun;
 
 export function streamChatSSE(
   run: GraphStreamRun,
@@ -63,7 +67,7 @@ export function blockedResponse(cors: Record<string, string>, message: string): 
 // only — the SSE contract above stays identical. Primary API: graph.stream with multi-mode
 // ["messages","values"]; "messages" yields [AIMessageChunk, metadata], "values" yields state.
 export function makeGraphRunner(graph: ReturnType<typeof buildGraph>): GraphRunner {
-  return (messages, consent) => {
+  return (messages, consent, session) => {
     let resolveFinal!: (f: GraphFinal) => void;
     let rejectFinal!: (e: unknown) => void;
     const final = new Promise<GraphFinal>((res, rej) => { resolveFinal = res; rejectFinal = rej; });
@@ -72,12 +76,16 @@ export function makeGraphRunner(graph: ReturnType<typeof buildGraph>): GraphRunn
       try {
         let lastState: any;
         const stream = await graph.stream(
-          { messages, consent } as any,
+          { messages, consent, leadSaved: session?.leadSaved ?? false, lead: session?.lead ?? {} } as any,
           { streamMode: ["messages", "values"] as any },
         );
         for await (const [mode, chunk] of stream as any) {
           if (mode === "messages") {
             const msgChunk = Array.isArray(chunk) ? chunk[0] : chunk;
+            // Only stream Leo's own words. Skip tool messages (e.g. "Lead delivered.")
+            // and anything that isn't an AI/assistant message.
+            const kind = msgChunk?._getType?.() ?? msgChunk?.getType?.();
+            if (kind && kind !== "ai") continue;
             const text = typeof msgChunk?.content === "string" ? msgChunk.content : "";
             if (text) yield text;
           } else if (mode === "values") {
@@ -85,13 +93,13 @@ export function makeGraphRunner(graph: ReturnType<typeof buildGraph>): GraphRunn
           }
         }
         const msgs: BaseMessage[] = lastState?.messages ?? [];
-        const last = msgs[msgs.length - 1];
-        resolveFinal({
-          reply: typeof last?.content === "string" ? last.content : "",
-          leadSaved: !!lastState?.leadSaved,
-          lead: lastState?.lead ?? {},
-          messages: msgs,
-        });
+        // Final reply = the last AI message (never a tool message).
+        let reply = "";
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          const kind = (msgs[i] as any)?._getType?.();
+          if (kind === "ai" && typeof msgs[i].content === "string") { reply = msgs[i].content as string; break; }
+        }
+        resolveFinal({ reply, leadSaved: !!lastState?.leadSaved, lead: lastState?.lead ?? {}, messages: msgs });
       } catch (e) {
         rejectFinal(e);
         throw e;

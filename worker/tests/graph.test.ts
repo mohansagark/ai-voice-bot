@@ -69,4 +69,14 @@ describe("graph", () => {
     expect(out.leadSaved).toBe(false);
     expect(String(out.messages.at(-1)?.content)).toMatch(/nice try/i);
   });
+
+  it("does not re-post the webhook when a lead was already saved this session", async () => {
+    const toolCall = new AIMessage({ content: "", tool_calls: [{ name: "save_lead", id: "c1", args: { name: "Jane", email: "jane@x.com", message: "again" } }] });
+    const posts: unknown[] = [];
+    const fetchImpl = (async () => { posts.push(1); return new Response("ok", { status: 200 }); }) as unknown as typeof fetch;
+    const g = buildGraph({ model: new FakeModel([toolCall]), persona: defaultPersona, webhookUrl: "https://hook.test/x", fetchImpl });
+    const out = await g.invoke({ messages: [new HumanMessage("save me again")], leadSaved: true, lead: { email: "jane@x.com" } } as any);
+    expect(posts.length).toBe(0);            // webhook NOT called again
+    expect(out.leadSaved).toBe(true);
+  });
 });

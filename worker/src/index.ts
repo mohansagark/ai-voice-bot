@@ -74,12 +74,12 @@ export function createApp(
         catch (e) { return Response.json({ error: String((e as Error).message) }, { status: 500, headers: cors }); }
 
         const BLOCK_MSG = "Looks like we're going in circles — I'm going to pause here. If you've got a real question, please reach out to Mohan directly.";
-        // Sticky block: a session already flagged as spam responds instantly, no model call.
-        if (state.blocked) return blockedResponse(cors, BLOCK_MSG);
-        // Token-free spam detection over this session's own messages (no LLM).
+        // Already blocked earlier this session → go silent (no message, no LLM). Cheapest possible.
+        if (state.blocked) return Response.json({ blocked: true }, { status: 429, headers: cors });
+        // Fresh spam trip: deliver the pause line ONCE, then the session is silent from here on.
         const userMsgs = [...state.messages.filter((m) => m.role === "human").map((m) => m.content), body.message];
         if (isSpam(userMsgs)) {
-          try { await handle.save({ ...state, blocked: true }); } catch { /* best-effort; block is what matters */ }
+          try { await handle.save({ ...state, blocked: true }); } catch { /* best-effort */ }
           return blockedResponse(cors, BLOCK_MSG);
         }
 
@@ -95,7 +95,10 @@ export function createApp(
         const graph = buildGraph({ model, persona: config.persona, webhookUrl: env.WEBHOOK_URL || "" });
         const history = deserializeMessages(state.messages);
         const messages = [...history, new HumanMessage(body.message)];
-        const run = deps.makeRunner(graph)(messages, body.consent ?? { agreed: false });
+        const run = deps.makeRunner(graph)(messages, body.consent ?? { agreed: false }, {
+          leadSaved: state.leadSaved ?? false,
+          lead: state.lead,
+        });
 
         const persist = async (f: GraphFinal): Promise<void> => {
           await handle.save({

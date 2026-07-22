@@ -43,7 +43,12 @@ export function makeAgentNode(deps: AgentDeps) {
   const system = new SystemMessage(buildSystemPrompt(deps.persona));
   const bound = deps.model.bindTools([saveLeadTool]);
   return async (state: ChatStateType): Promise<Partial<ChatStateType>> => {
-    const reply = await bound.invoke([system, ...state.messages]);
+    const extra = state.leadSaved
+      ? [new SystemMessage(
+          "IMPORTANT: You have already recorded this visitor's contact details this session. Do NOT ask for their name/email again and do NOT call save_lead again — just chat naturally and help with whatever they say next.",
+        )]
+      : [];
+    const reply = await bound.invoke([system, ...extra, ...state.messages]);
     return { messages: [reply] };
   };
 }
@@ -59,6 +64,10 @@ export function makeSaveLeadNode(deps: AgentDeps) {
     const last = state.messages[state.messages.length - 1] as AIMessage;
     const call = (last.tool_calls ?? []).find((c) => c.name === "save_lead");
     if (!call) return {};
+    // Already captured this session — acknowledge without re-posting or re-confirming.
+    if (state.leadSaved) {
+      return { messages: [new AIMessage("You're all set — I've already passed your details along. What else can I help you with?")] };
+    }
     const parsed = saveLeadSchema.safeParse(call.args);
     if (!parsed.success || !isValidEmail(parsed.data.email)) {
       return {
@@ -87,7 +96,10 @@ export function makeSaveLeadNode(deps: AgentDeps) {
   };
 }
 
-export function routeAfterSaveLead(state: ChatStateType): "confirm" | "agent" {
+export function routeAfterSaveLead(state: ChatStateType): "confirm" | "agent" | "end" {
+  const last = state.messages[state.messages.length - 1];
+  // If save_lead ran but the last message is a plain AI line (already-recorded ack), end.
+  if (last?._getType?.() === "ai") return "end";
   return state.leadSaved ? "confirm" : "agent";
 }
 

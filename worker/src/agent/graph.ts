@@ -18,7 +18,7 @@ export function buildGraph(deps: AgentDeps) {
     .addConditionalEdges("guardrail", routeAfterGuardrail, { refuse: "refuse", agent: "agent" })
     .addEdge("refuse", END)
     .addConditionalEdges("agent", routeAfterAgent, { save_lead: "save_lead", end: END })
-    .addConditionalEdges("save_lead", routeAfterSaveLead, { confirm: "confirm", agent: "agent" })
+    .addConditionalEdges("save_lead", routeAfterSaveLead, { confirm: "confirm", agent: "agent", end: END })
     .addEdge("confirm", END)
     .compile();
 }

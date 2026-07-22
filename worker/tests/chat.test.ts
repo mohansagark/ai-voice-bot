@@ -131,15 +131,15 @@ describe("/chat (SSE + session memory)", () => {
     expect(map.get("s1")?.blocked).toBe(true);             // session is now sticky-blocked
   });
 
-  it("a blocked session rejects further messages instantly without the model", async () => {
+  it("a blocked session goes silent (429, no message, no model call)", async () => {
     const map = new Map<string, SessionState>([["s1", { messages: [], lead: {}, leadSaved: false, turns: 2, blocked: true }]]);
     const getSession = (_e: Env, id: string): SessionHandle => ({
       load: async () => map.get(id)!, save: async (s) => void map.set(id, s),
     });
     const { seen, makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });
     const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
-    const body = await readSSE(await app.fetch(chatReq({ session_id: "s1", message: "hello?" }), env));
-    expect(body).toContain("going in circles");
-    expect(seen.length).toBe(0);   // no model call -> no tokens spent
+    const res = await app.fetch(chatReq({ session_id: "s1", message: "hello?" }), env);
+    expect(res.status).toBe(429);
+    expect(seen.length).toBe(0);   // no model call -> no tokens
   });
 });
