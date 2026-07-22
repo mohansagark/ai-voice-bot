@@ -34,7 +34,7 @@ export function routeAfterGuardrail(state: ChatStateType): "refuse" | "agent" {
 export function refuseNode(): Partial<ChatStateType> {
   return {
     messages: [new AIMessage(
-      "I can only help with questions about Mohan and take a message for him. What would you like me to pass along?",
+      "Ha — nice try! But I'm just here to chat about Mohan and pass a note along for you. So… what's actually on your mind?",
     )],
   };
 }
@@ -96,7 +96,7 @@ export function makeConfirmNode(deps: AgentDeps) {
     const name = state.lead.name ?? "there";
     return {
       messages: [new AIMessage(
-        `Thanks, ${name}! I've passed your message along to ${deps.persona.owner.name}, who will reach out at the email you gave.`,
+        `Amazing — got it, ${name}! I'll make sure ${deps.persona.owner.name} sees this and gets back to you at the email you gave. Lovely chatting with you.`,
       )],
     };
   };

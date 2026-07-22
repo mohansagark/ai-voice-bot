@@ -20,4 +20,9 @@ describe("buildSystemPrompt", () => {
   it("instructs to call save_lead", () => {
     expect(prompt).toContain("save_lead");
   });
+  it("carries the human, playful voice guidance (lead with personality, not a résumé)", () => {
+    expect(prompt).toMatch(/playful/i);
+    expect(prompt).toMatch(/LinkedIn bio|r[eé]sum[eé]/i);
+    expect(prompt).toMatch(/never sound like|not a corporate chatbot/i);
+  });
 });
