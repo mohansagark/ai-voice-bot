@@ -8,3 +8,4 @@ venv/
 leads.jsonl
 .DS_Store
 .dev.vars
+.wrangler/
