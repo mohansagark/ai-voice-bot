@@ -41,7 +41,12 @@
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ session_id: sid, message, consent: { agreed: true, timestamp: new Date().toISOString() } }),
     });
-    if (res.status === 429) { botLine.remove(); return; }              // blocked → Leo goes silent
+    if (res.status === 429) {
+      const info = await res.json().catch(() => ({}));
+      if (info && info.blocked) { botLine.remove(); return; }   // spam-block → Leo goes silent
+      botLine.textContent = "Leo: (This chat has reached its limit — please start a new session.)";
+      return;
+    }
     if (!res.ok || !res.body) { botLine.textContent = "Leo: [error " + res.status + "]"; return; }
 
     // Minimal SSE parser over the fetch stream.
