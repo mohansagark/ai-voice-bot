@@ -9,3 +9,4 @@ leads.jsonl
 .DS_Store
 .dev.vars
 .wrangler/
+widget/dist/

@@ -1,0 +1,19 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>AI Voice Bot — embed demo</title>
+<style>
+  /* Deliberately aggressive host CSS to prove Shadow DOM isolation. */
+  * { color: crimson !important; font-family: "Comic Sans MS", cursive !important; }
+  body { max-width: 620px; margin: 40px auto; }
+</style>
+<h1>Embed demo</h1>
+<p>The floating orb (bottom-right) is the widget. This page's loud CSS must NOT affect it.</p>
+<script>
+  window.AiVoiceBotConfig = {
+    workerUrl: "http://localhost:8787",
+    branding: { botName: "Leo", themeColor: "#6C5CE7", greeting: "Hi, I'm Leo — how can I help?" },
+    privacy: { consentText: "I agree to share my info so Mohan can follow up.", privacyPolicyUrl: "https://devmohan.in/privacy" },
+    advanced: { analyticsCallback: (e, p) => console.log("[analytics]", e, p || "") },
+  };
+</script>
+<script src="./dist/ai-voice-bot.min.js" defer></script>
