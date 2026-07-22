@@ -32,7 +32,11 @@ export function createSession(store: Store) {
     id,
     name: () => store.get(K_NAME),
     setName: (n: string) => store.set(K_NAME, n),
-    consent: (): Consent | null => { const raw = store.get(K_CONSENT); return raw ? (JSON.parse(raw) as Consent) : null; },
+    consent: (): Consent | null => {
+      const raw = store.get(K_CONSENT);
+      if (!raw) return null;
+      try { return JSON.parse(raw) as Consent; } catch { return null; }
+    },
     setConsent: (text: string): Consent => {
       const c: Consent = { agreed: true, timestamp: new Date().toISOString(), text };
       store.set(K_CONSENT, JSON.stringify(c));

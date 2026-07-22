@@ -37,4 +37,11 @@ describe("session", () => {
     expect(s.consent()).toBeNull();
     expect(s.id()).not.toBe(first);   // a fresh id after forget
   });
+
+  it("returns null (does not throw) on corrupted consent data", () => {
+    const store = memoryStore();
+    store.set("avb_consent", "{not valid json");
+    expect(() => createSession(store).consent()).not.toThrow();
+    expect(createSession(store).consent()).toBeNull();
+  });
 });
