@@ -29,8 +29,10 @@ export function wirePanel(refs: Refs) {
     showConsent: (cfg: WidgetConfig, onAgree: () => void) => {
       const box = document.createElement("div");
       box.className = "consent";
-      const link = cfg.privacy.privacyPolicyUrl
-        ? ` <a href="${cfg.privacy.privacyPolicyUrl}" target="_blank" rel="noopener">Privacy</a>`
+      const url = cfg.privacy.privacyPolicyUrl;
+      const safeUrl = url && /^https?:\/\//i.test(url) ? url : null;
+      const link = safeUrl
+        ? ` <a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener">Privacy</a>`
         : "";
       box.innerHTML = `<div>${escapeHtml(cfg.privacy.consentText)}${link}</div><button type="button">Got it</button>`;
       refs.list.appendChild(box); scroll();
