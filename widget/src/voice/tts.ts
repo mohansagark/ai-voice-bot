@@ -78,6 +78,7 @@ export function createSpeaker(cfg: SpeakerConfig, deps: SpeakerDeps = {}): Speak
     stop(): void {
       currentAudio?.pause();
       deps.synth?.cancel();
+      setState("idle");
     },
     onState(cb: (s: SpeakState) => void): void { stateCb = cb; },
   };

@@ -131,13 +131,25 @@ describe("mount", () => {
     }
   });
 
-  it("sound toggle flips aria-pressed and persists across remounts", () => {
+  it("sound toggle flips aria-pressed (muted state, not raw soundOn) and persists across remounts", () => {
     const store = memoryStore();
     const app1 = mount(baseCfg, { store, fetchImpl: fetch })!;
-    expect(app1.refs.sound.getAttribute("aria-pressed")).toBe("false");
-    app1.refs.sound.click();
+    // speakByDefault: false -> soundOn starts false (muted) -> aria-pressed (= muted) starts "true".
     expect(app1.refs.sound.getAttribute("aria-pressed")).toBe("true");
+    app1.refs.sound.click(); // unmutes
+    expect(app1.refs.sound.getAttribute("aria-pressed")).toBe("false");
     const app2 = mount(baseCfg, { store, fetchImpl: fetch })!;
-    expect(app2.refs.sound.getAttribute("aria-pressed")).toBe("true");
+    expect(app2.refs.sound.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("aria-pressed/aria-label on the sound toggle track the muted state, not the raw soundOn flag", () => {
+    const app = mount(baseCfg, { store: memoryStore(), fetchImpl: fetch })!;
+    // Default (speakByDefault: false) starts muted: pressed=true, label reads "Unmute".
+    expect(app.refs.sound.getAttribute("aria-pressed")).toBe("true");
+    expect(app.refs.sound.getAttribute("aria-label")).toContain("Unmute");
+    app.refs.sound.click(); // unmute
+    expect(app.refs.sound.getAttribute("aria-pressed")).toBe("false");
+    expect(app.refs.sound.getAttribute("aria-label")).toContain("Mute");
+    expect(app.refs.sound.getAttribute("aria-label")).not.toContain("Unmute");
   });
 });

@@ -59,7 +59,14 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
 
     const renderSound = () => {
       refs.sound.textContent = soundOn ? "🔊" : "🔇";
-      refs.sound.setAttribute("aria-pressed", String(soundOn));
+      // aria-pressed reflects whether the "mute" action is currently active
+      // (i.e. muted), matching the button's "Mute {botName}'s voice" label —
+      // not the raw soundOn flag, which is inverted from that.
+      refs.sound.setAttribute("aria-pressed", String(!soundOn));
+      refs.sound.setAttribute(
+        "aria-label",
+        soundOn ? `Mute ${cfg.branding.botName}'s voice` : `Unmute ${cfg.branding.botName}'s voice`,
+      );
     };
     renderSound();
     if (!cfg.voice.enabled) refs.sound.style.display = "none";

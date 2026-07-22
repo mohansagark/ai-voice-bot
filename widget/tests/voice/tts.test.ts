@@ -68,6 +68,26 @@ describe("createSpeaker", () => {
     expect(cancelled).toEqual([true]);
   });
 
+  it("stop() reports idle after reaching speaking, so an observer (e.g. the orb) clears its 'speaking' state on mute-mid-playback", async () => {
+    const audio = fakeAudio();
+    const states: string[] = [];
+    const fetchImpl = (async () => new Response("bytes", { status: 200 })) as unknown as typeof fetch;
+    const speaker = createSpeaker(cfg, { fetchImpl, makeAudio: () => audio });
+    speaker.onState((s) => states.push(s));
+    await speaker.speak("Hi there");
+    expect(states).toEqual(["speaking"]);
+    speaker.stop();
+    expect(states).toEqual(["speaking", "idle"]);
+  });
+
+  it("stop() is a safe no-op when nothing was ever speaking (still reports idle, no throw)", () => {
+    const states: string[] = [];
+    const speaker = createSpeaker(cfg, {});
+    speaker.onState((s) => states.push(s));
+    expect(() => speaker.stop()).not.toThrow();
+    expect(states).toEqual(["idle"]);
+  });
+
   it("never throws/rejects when the injected synth.speak() itself throws, and settles at idle", async () => {
     const states: string[] = [];
     const synth = {
