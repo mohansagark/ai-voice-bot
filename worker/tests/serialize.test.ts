@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { AIMessage, HumanMessage, ToolMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage, ToolMessage, SystemMessage } from "@langchain/core/messages";
 import { serializeMessages, deserializeMessages } from "../src/agent/serialize";
 
 describe("message serialization", () => {
@@ -28,8 +28,9 @@ describe("message serialization", () => {
   });
 
   it("skips system messages (rebuilt each turn)", () => {
-    // A valid ai->tool sequence survives; system is never stored.
-    const seq = [new HumanMessage("hi"), new AIMessage("hello")];
-    expect(deserializeMessages(serializeMessages(seq))).toHaveLength(2);
+    const seq = [new SystemMessage("You are helpful"), new HumanMessage("hi"), new AIMessage("hello")];
+    const stored = serializeMessages(seq);
+    expect(stored).toHaveLength(2); // SystemMessage filtered out
+    expect(deserializeMessages(stored)).toHaveLength(2);
   });
 });
