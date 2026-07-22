@@ -1,0 +1,45 @@
+import type { Refs } from "./dom";
+import type { WidgetConfig } from "./types";
+
+export function wirePanel(refs: Refs) {
+  const scroll = () => { refs.list.scrollTop = refs.list.scrollHeight; };
+  const line = (cls: string, text = ""): HTMLElement => {
+    const d = document.createElement("div");
+    d.className = `msg ${cls}`;
+    d.textContent = text;
+    refs.list.appendChild(d); scroll();
+    return d;
+  };
+  return {
+    addUser: (text: string) => void line("user", text),
+    startBot: (): HTMLElement => line("bot", ""),
+    appendBot: (el: HTMLElement, text: string) => { el.textContent = (el.textContent ?? "") + text; scroll(); },
+    endBot: (el: HTMLElement) => { if (!el.textContent) el.textContent = "…"; scroll(); },
+    note: (text: string) => void line("note", text),
+    showError: () => void line("bot", "Hmm, something hiccuped — mind trying that again?"),
+    onSubmit: (handler: (text: string) => void) => {
+      refs.form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const t = refs.input.value.trim();
+        if (!t) return;
+        refs.input.value = "";
+        handler(t);
+      });
+    },
+    showConsent: (cfg: WidgetConfig, onAgree: () => void) => {
+      const box = document.createElement("div");
+      box.className = "consent";
+      const link = cfg.privacy.privacyPolicyUrl
+        ? ` <a href="${cfg.privacy.privacyPolicyUrl}" target="_blank" rel="noopener">Privacy</a>`
+        : "";
+      box.innerHTML = `<div>${escapeHtml(cfg.privacy.consentText)}${link}</div><button type="button">Got it</button>`;
+      refs.list.appendChild(box); scroll();
+      box.querySelector("button")!.addEventListener("click", () => { box.remove(); onAgree(); });
+    },
+    clearConsent: () => refs.list.querySelector(".consent")?.remove(),
+  };
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
