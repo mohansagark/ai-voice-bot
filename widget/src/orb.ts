@@ -1,5 +1,8 @@
 import type { Refs } from "./dom";
 
+type OrbState = "idle" | "thinking" | "listening" | "speaking";
+const STATES: OrbState[] = ["idle", "thinking", "listening", "speaking"];
+
 export function wireOrb(refs: Refs, onToggle?: (open: boolean) => void) {
   const setOpen = (open: boolean) => {
     refs.panel.setAttribute("data-open", String(open));
@@ -9,14 +12,30 @@ export function wireOrb(refs: Refs, onToggle?: (open: boolean) => void) {
   const isOpen = () => refs.panel.getAttribute("data-open") === "true";
   refs.orb.addEventListener("click", () => setOpen(!isOpen()));
   refs.panel.querySelector(".close")!.addEventListener("click", () => setOpen(false));
+
+  const setState = (state: OrbState) => {
+    for (const s of STATES) refs.orb.classList.toggle(s, s === state);
+  };
+
+  const getCurrentState = (): OrbState => {
+    for (const s of STATES) {
+      if (refs.orb.classList.contains(s)) return s;
+    }
+    return "idle";
+  };
+
+  const makeStateToggle = (targetState: OrbState) => (on: boolean) => {
+    if (on) setState(targetState);
+    else if (getCurrentState() === targetState) setState("idle");
+  };
+
   return {
     open: () => setOpen(true),
     close: () => setOpen(false),
     toggle: () => setOpen(!isOpen()),
     isOpen,
-    setThinking: (on: boolean) => {
-      refs.orb.classList.toggle("thinking", on);
-      refs.orb.classList.toggle("idle", !on);
-    },
+    setThinking: makeStateToggle("thinking"),
+    setListening: makeStateToggle("listening"),
+    setSpeaking: makeStateToggle("speaking"),
   };
 }

@@ -16,6 +16,10 @@ export function css(theme: string): string {
   @keyframes avb-spin { to { transform: rotate(360deg); } }
   .orb.thinking::after { content:""; width:22px; height:22px; border:3px solid #ffffff55; border-top-color:#fff; border-radius:50%; animation: avb-spin .8s linear infinite; }
   .orb.thinking { font-size: 0; }
+  @keyframes avb-listen { 0%,100% { box-shadow: 0 6px 24px rgba(0,0,0,.28); } 50% { box-shadow: 0 0 0 8px ${theme}33; } }
+  .orb.listening { animation: avb-listen 1.2s ease-in-out infinite; }
+  @keyframes avb-speak { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+  .orb.speaking { animation: avb-speak .6s ease-in-out infinite; }
 
   .panel {
     position: fixed; bottom: 88px; width: 360px; max-width: calc(100vw - 32px);
@@ -39,6 +43,6 @@ export function css(theme: string): string {
   input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 14px; }
   input:focus-visible { outline: 2px solid ${theme}; outline-offset: 1px; }
   form button { background: ${theme}; color: #fff; border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
-  @media (prefers-reduced-motion: reduce) { .orb.idle { animation: none; } .orb.thinking::after { animation-duration: 1.6s; } }
+  @media (prefers-reduced-motion: reduce) { .orb.idle { animation: none; } .orb.thinking::after { animation-duration: 1.6s; } .orb.listening, .orb.speaking { animation: none; } }
   `;
 }
