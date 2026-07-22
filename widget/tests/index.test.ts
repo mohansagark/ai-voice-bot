@@ -104,6 +104,33 @@ describe("mount", () => {
     }
   });
 
+  it("tap-to-talk: a second mic tap while still listening does not call start() again", () => {
+    class FakeRecognition {
+      static last: FakeRecognition | null = null;
+      lang = ""; continuous = true; interimResults = true;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      startCalls = 0;
+      constructor() { FakeRecognition.last = this; }
+      start() { this.startCalls++; }
+      stop() {}
+    }
+    (window as any).SpeechRecognition = FakeRecognition;
+    try {
+      const app = mount(baseCfg, { store: memoryStore(), fetchImpl: fetch })!;
+      expect(app.refs.mic.disabled).toBe(false);
+      app.refs.mic.click(); // first tap — starts listening
+      expect(FakeRecognition.last!.startCalls).toBe(1);
+      expect(app.refs.orb.classList.contains("listening")).toBe(true);
+      // second tap before onresult/onend/onerror fires — the first session is still "running"
+      app.refs.mic.click();
+      expect(FakeRecognition.last!.startCalls).toBe(1); // guarded: start() was not called again
+    } finally {
+      delete (window as any).SpeechRecognition;
+    }
+  });
+
   it("sound toggle flips aria-pressed and persists across remounts", () => {
     const store = memoryStore();
     const app1 = mount(baseCfg, { store, fetchImpl: fetch })!;

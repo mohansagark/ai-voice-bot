@@ -31,6 +31,7 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
     let greeted = false;
     let consentPending = false;
     let pendingVoice = false;
+    let listening = false;
     let soundOn = session.soundOn(cfg.voice.speakByDefault);
 
     const speaker = cfg.voice.enabled
@@ -120,8 +121,8 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
             pendingVoice = true;
             refs.form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
           },
-          onEnd: () => orb.setListening(false),
-          onError: () => orb.setListening(false),
+          onEnd: () => { listening = false; orb.setListening(false); },
+          onError: () => { listening = false; orb.setListening(false); },
         });
       } catch {
         recognizer = null;
@@ -132,8 +133,15 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
       refs.mic.title = "voice input isn't available in this browser — type instead";
     } else {
       refs.mic.addEventListener("click", () => {
+        if (listening) return; // already listening — ignore the repeat tap
+        listening = true;
         orb.setListening(true);
-        recognizer!.start();
+        try {
+          recognizer!.start();
+        } catch {
+          listening = false;
+          orb.setListening(false);
+        }
       });
     }
 
