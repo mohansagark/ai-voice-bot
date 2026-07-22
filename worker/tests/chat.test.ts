@@ -44,6 +44,7 @@ describe("/chat (SSE + session memory)", () => {
     expect(res.headers.get("content-type")).toBe("text/event-stream");
     const body = await readSSE(res);
     expect(body).toContain(`event: token`);
+    expect(body).toContain(`"text":"Hi "`);
     expect(body).toContain(`"text":"there"`);
     expect(body).toContain(`event: done`);
     expect(body).toContain(`"reply":"Hi there"`);

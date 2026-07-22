@@ -77,7 +77,7 @@ export function createApp(
         }
         const turns = state.turns + 1;
 
-        let model;
+        let model: ReturnType<typeof deps.buildModel>;
         try { model = deps.buildModel(config, env); }
         catch (e) { return Response.json({ error: String((e as Error).message) }, { status: 500, headers: cors }); }
 
