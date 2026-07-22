@@ -73,4 +73,12 @@ describe("createRecognizer", () => {
     expect(started).toBe(true);
     expect(stopped).toBe(true);
   });
+
+  it("returns null when constructor throws", () => {
+    function throwingCtor() {
+      throw new Error("Construction forbidden by browser policy");
+    }
+    const result = createRecognizer("en-US", { onResult() {}, onEnd() {}, onError() {} }, { SpeechRecognition: throwingCtor as unknown as new () => Instance });
+    expect(result).toBeNull();
+  });
 });

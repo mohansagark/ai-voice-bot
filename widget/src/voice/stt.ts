@@ -32,12 +32,16 @@ export function createRecognizer(
 ): { start(): void; stop(): void } | null {
   const Ctor = getCtor(w);
   if (!Ctor) return null;
-  const rec = new Ctor();
-  rec.lang = lang;
-  rec.continuous = false;
-  rec.interimResults = false;
-  rec.onresult = (e) => handlers.onResult(e.results[0]?.[0]?.transcript ?? "");
-  rec.onerror = (e) => handlers.onError(e.error ?? "recognition error");
-  rec.onend = () => handlers.onEnd();
-  return { start: () => rec.start(), stop: () => rec.stop() };
+  try {
+    const rec = new Ctor();
+    rec.lang = lang;
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.onresult = (e) => handlers.onResult(e.results[0]?.[0]?.transcript ?? "");
+    rec.onerror = (e) => handlers.onError(e.error ?? "recognition error");
+    rec.onend = () => handlers.onEnd();
+    return { start: () => rec.start(), stop: () => rec.stop() };
+  } catch {
+    return null;
+  }
 }
