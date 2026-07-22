@@ -5,7 +5,8 @@ import { HumanMessage } from "@langchain/core/messages";
 import { serializeMessages, deserializeMessages } from "./agent/serialize";
 import type { SessionState } from "./session-store";
 import { SessionDO } from "./session-do";
-import { streamChatSSE, makeGraphRunner, type GraphRunner, type GraphFinal } from "./stream";
+import { isSpam } from "./spam";
+import { streamChatSSE, makeGraphRunner, blockedResponse, type GraphRunner, type GraphFinal } from "./stream";
 
 export interface SessionHandle {
   load(): Promise<SessionState>;
@@ -71,6 +72,16 @@ export function createApp(
         let state: SessionState;
         try { state = await handle.load(); }
         catch (e) { return Response.json({ error: String((e as Error).message) }, { status: 500, headers: cors }); }
+
+        const BLOCK_MSG = "Looks like we're going in circles — I'm going to pause here. If you've got a real question, please reach out to Mohan directly.";
+        // Sticky block: a session already flagged as spam responds instantly, no model call.
+        if (state.blocked) return blockedResponse(cors, BLOCK_MSG);
+        // Token-free spam detection over this session's own messages (no LLM).
+        const userMsgs = [...state.messages.filter((m) => m.role === "human").map((m) => m.content), body.message];
+        if (isSpam(userMsgs)) {
+          try { await handle.save({ ...state, blocked: true }); } catch { /* best-effort; block is what matters */ }
+          return blockedResponse(cors, BLOCK_MSG);
+        }
 
         if (state.turns + 1 > config.maxTurnsPerSession) {
           return Response.json({ error: "too many turns" }, { status: 429, headers: cors });

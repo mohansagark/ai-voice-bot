@@ -50,6 +50,13 @@ export function streamChatSSE(
   });
 }
 
+// A complete, token-free SSE response: just a `done` frame carrying a fixed message.
+export function blockedResponse(cors: Record<string, string>, message: string): Response {
+  return new Response(sse("done", { reply: message, lead_saved: false }), {
+    headers: { ...cors, "content-type": "text/event-stream", "cache-control": "no-cache" },
+  });
+}
+
 // --- LangGraph-streaming adapter (verified by the wrangler dev smoke test, not unit-tested) ---
 // Drives the compiled graph, yielding LLM token text and resolving the final graph state.
 // If the installed @langchain/langgraph exposes a different streaming surface, adjust HERE

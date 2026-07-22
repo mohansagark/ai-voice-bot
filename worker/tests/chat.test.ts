@@ -113,4 +113,33 @@ describe("/chat (SSE + session memory)", () => {
     const res = await app.fetch(new Request("https://w/health"), env);
     expect((await res.json() as any).provider).toBe("groq");
   });
+
+  it("blocks repetitive spam after the threshold WITHOUT calling the model", async () => {
+    // Pre-seed 7 identical prior user turns; the 8th (also identical) trips the 4x/low-diversity rule.
+    const map = new Map<string, SessionState>([["s1", {
+      messages: Array(7).fill(0).map(() => ({ role: "human" as const, content: "buy now" })),
+      lead: {}, leadSaved: false, turns: 7,
+    }]]);
+    const getSession = (_e: Env, id: string): SessionHandle => ({
+      load: async () => map.get(id)!, save: async (s) => void map.set(id, s),
+    });
+    const { seen, makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    const body = await readSSE(await app.fetch(chatReq({ session_id: "s1", message: "buy now" }), env));
+    expect(body).toContain("going in circles");           // the pause message was delivered
+    expect(seen.length).toBe(0);                            // the model runner was NEVER called (no tokens)
+    expect(map.get("s1")?.blocked).toBe(true);             // session is now sticky-blocked
+  });
+
+  it("a blocked session rejects further messages instantly without the model", async () => {
+    const map = new Map<string, SessionState>([["s1", { messages: [], lead: {}, leadSaved: false, turns: 2, blocked: true }]]);
+    const getSession = (_e: Env, id: string): SessionHandle => ({
+      load: async () => map.get(id)!, save: async (s) => void map.set(id, s),
+    });
+    const { seen, makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    const body = await readSSE(await app.fetch(chatReq({ session_id: "s1", message: "hello?" }), env));
+    expect(body).toContain("going in circles");
+    expect(seen.length).toBe(0);   // no model call -> no tokens spent
+  });
 });

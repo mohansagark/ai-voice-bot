@@ -11,6 +11,7 @@ export interface SessionState {
   lead: Lead;
   leadSaved: boolean;
   turns: number;
+  blocked?: boolean;   // set true once anti-spam trips; sticky for the session
 }
 
 const KEY = "session";
