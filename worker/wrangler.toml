@@ -9,6 +9,8 @@ DEFAULT_PROVIDER = "groq"
 MAX_MESSAGE_CHARS = "2000"
 MAX_TURNS_PER_SESSION = "30"
 MODE = "prod"
+TTS_VOICE = "Fritz-PlayAI"
+MAX_TTS_CHARS = "1200"
 
 [[durable_objects.bindings]]
 name = "SESSION_DO"

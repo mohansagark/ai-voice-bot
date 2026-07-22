@@ -17,6 +17,8 @@ export interface AppConfig {
   maxMessageChars: number;
   maxTurnsPerSession: number;
   mode: "dev" | "prod";
+  ttsVoice: string;
+  maxTtsChars: number;
 }
 
 export interface Env {
@@ -28,6 +30,8 @@ export interface Env {
   MAX_MESSAGE_CHARS?: string;
   MAX_TURNS_PER_SESSION?: string;
   MODE?: string;
+  TTS_VOICE?: string;
+  MAX_TTS_CHARS?: string;
   SESSION_DO: DurableObjectNamespace;
 }
 
@@ -64,6 +68,8 @@ export function loadConfig(env: Env): AppConfig {
     maxMessageChars: Number(env.MAX_MESSAGE_CHARS || "2000"),
     maxTurnsPerSession: Number(env.MAX_TURNS_PER_SESSION || "30"),
     mode: env.MODE === "dev" ? "dev" : "prod",
+    ttsVoice: env.TTS_VOICE || "Fritz-PlayAI",
+    maxTtsChars: Number(env.MAX_TTS_CHARS || "1200"),
   };
 }
 

@@ -7,6 +7,7 @@ import type { SessionState } from "./session-store";
 import { SessionDO } from "./session-do";
 import { isSpam } from "./spam";
 import { streamChatSSE, makeGraphRunner, blockedResponse, type GraphRunner, type GraphFinal } from "./stream";
+import { synthesizeSpeech } from "./tts";
 
 export interface SessionHandle {
   load(): Promise<SessionState>;
@@ -23,6 +24,7 @@ export interface Deps {
   buildModel: typeof buildModel;
   getSession: (env: Env, sessionId: string) => SessionHandle;
   makeRunner: (graph: ReturnType<typeof buildGraph>) => GraphRunner;
+  fetchImpl?: typeof fetch;
 }
 
 function corsHeaders(origin: string, allowed: string[], allowAll = false): Record<string, string> {
@@ -52,7 +54,7 @@ export function createApp(
       if (url.pathname === "/health") {
         const p = config.providers[config.defaultProvider];
         return Response.json(
-          { ok: true, provider: config.defaultProvider, model: p?.model, tts: "browser", leads: env.WEBHOOK_URL ? "webhook" : "none", mode: config.mode },
+          { ok: true, provider: config.defaultProvider, model: p?.model, tts: env.GROQ_API_KEY ? "groq" : "browser", leads: env.WEBHOOK_URL ? "webhook" : "none", mode: config.mode },
           { headers: cors },
         );
       }
@@ -111,6 +113,26 @@ export function createApp(
         };
 
         return streamChatSSE(run, cors, persist);
+      }
+
+      if (url.pathname === "/tts" && request.method === "POST") {
+        if (enforce && config.allowedOrigins.length && !config.allowedOrigins.includes(origin)) {
+          return Response.json({ error: "origin not allowed" }, { status: 403, headers: cors });
+        }
+        const body = (await request.json().catch(() => null)) as { text?: string; voice?: string } | null;
+        if (!body?.text || !body.text.trim()) {
+          return Response.json({ error: "text is required" }, { status: 400, headers: cors });
+        }
+        if (enforce && body.text.length > config.maxTtsChars) {
+          return Response.json({ error: "text too long" }, { status: 413, headers: cors });
+        }
+        if (!env.GROQ_API_KEY) {
+          return Response.json({ error: "tts not configured" }, { status: 502, headers: cors });
+        }
+        const voice = body.voice || config.ttsVoice;
+        const result = await synthesizeSpeech(body.text, voice, env.GROQ_API_KEY, deps.fetchImpl ?? fetch);
+        if (!result.ok) return Response.json({ error: result.error }, { status: result.status, headers: cors });
+        return new Response(result.body, { status: 200, headers: { ...cors, "content-type": result.contentType } });
       }
 
       return new Response("Not found", { status: 404, headers: cors });
