@@ -31,6 +31,10 @@ export function css(theme: string): string {
   .panel[data-open="true"] { display: flex; }
   .hd { background: ${theme}; color: #fff; padding: 14px 16px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
   .hd button { background: transparent; border: none; color: #fff; font-size: 20px; cursor: pointer; line-height: 1; }
+  .hd-actions { display: flex; align-items: center; gap: 2px; }
+  form .mic { background: transparent; border: 1px solid #ddd; border-radius: 10px; padding: 8px 10px; cursor: pointer; font-size: 16px; }
+  form .mic:disabled { opacity: .4; cursor: not-allowed; }
+  form .mic.listening { border-color: ${theme}; }
   .list { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
   .msg { max-width: 82%; padding: 9px 12px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
   .msg.bot { background: #f0eef7; align-self: flex-start; border-bottom-left-radius: 4px; }

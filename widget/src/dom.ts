@@ -5,6 +5,7 @@ export interface Refs {
   host: HTMLElement; shadow: ShadowRoot;
   orb: HTMLButtonElement; panel: HTMLElement; header: HTMLElement;
   list: HTMLElement; form: HTMLFormElement; input: HTMLInputElement;
+  mic: HTMLButtonElement; sound: HTMLButtonElement;
 }
 
 export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.body): Refs {
@@ -30,9 +31,19 @@ export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.bod
   panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-label", `Chat with ${cfg.branding.botName}`);
   panel.innerHTML = `
-    <div class="hd"><span>${escapeHtml(cfg.branding.botName)}</span><button class="close" aria-label="Close">×</button></div>
+    <div class="hd">
+      <span>${escapeHtml(cfg.branding.botName)}</span>
+      <div class="hd-actions">
+        <button type="button" class="sound" aria-label="Mute ${escapeHtml(cfg.branding.botName)}'s voice" aria-pressed="false">🔊</button>
+        <button class="close" aria-label="Close">×</button>
+      </div>
+    </div>
     <div class="list"></div>
-    <form><input type="text" placeholder="Type a message…" autocomplete="off" aria-label="Message" /><button type="submit">Send</button></form>
+    <form>
+      <input type="text" placeholder="Type a message…" autocomplete="off" aria-label="Message" />
+      <button type="button" class="mic" aria-label="Speak your message">🎤</button>
+      <button type="submit">Send</button>
+    </form>
   `;
   shadow.appendChild(panel);
 
@@ -42,6 +53,8 @@ export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.bod
     list: panel.querySelector(".list")!,
     form: panel.querySelector("form")!,
     input: panel.querySelector("input")!,
+    mic: panel.querySelector(".mic")!,
+    sound: panel.querySelector(".sound")!,
   };
 }
 

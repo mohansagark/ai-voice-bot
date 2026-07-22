@@ -23,4 +23,14 @@ describe("mountShell", () => {
     // No <style> was added to the document head by the widget.
     expect(document.head.querySelector("style[data-avb]")).toBeNull();
   });
+
+  it("mounts a mic button and a sound toggle inside the shadow root", () => {
+    const refs = mountShell(cfg);
+    expect(refs.mic).toBeTruthy();
+    expect(refs.sound).toBeTruthy();
+    expect(refs.shadow.contains(refs.mic)).toBe(true);
+    expect(refs.shadow.contains(refs.sound)).toBe(true);
+    expect(refs.mic.getAttribute("type")).toBe("button");
+    expect(refs.sound.getAttribute("aria-pressed")).toBe("false");
+  });
 });
