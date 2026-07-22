@@ -55,4 +55,12 @@ describe("streamChatSSE", () => {
     expect(body).toContain(`event: error`);
     expect(body).toContain(`stream boom`);
   });
+
+  it("still delivers done when persist rejects (non-fatal)", async () => {
+    const final: GraphFinal = { reply: "ok", leadSaved: false, lead: {}, messages: [new AIMessage("ok")] };
+    const res = streamChatSSE(runFrom(["ok"], final), cors, async () => { throw new Error("save failed"); });
+    const body = await bodyText(res);
+    expect(body).toContain(`event: done`);
+    expect(body).toContain(`"reply":"ok"`);
+  });
 });

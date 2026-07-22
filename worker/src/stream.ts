@@ -25,6 +25,8 @@ export function streamChatSSE(
 ): Response {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      // Ensure a rejected final (e.g. token stream error) never becomes an unhandled rejection.
+      void run.final.catch(() => {});
       const enc = new TextEncoder();
       const send = (event: string, data: unknown) => controller.enqueue(enc.encode(sse(event, data)));
       try {
