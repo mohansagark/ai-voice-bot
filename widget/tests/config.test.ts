@@ -22,4 +22,16 @@ describe("validateConfig", () => {
     expect(cfg!.branding.botName).toBe("Ari");
     expect(cfg!.branding.themeColor).toBe(DEFAULTS.branding.themeColor);
   });
+
+  it("fills voice + language defaults", () => {
+    const cfg = validateConfig({ workerUrl: "https://w.test" });
+    expect(cfg!.behavior.language).toBe("en-US");
+    expect(cfg!.voice).toEqual({ enabled: true, ttsVoice: "Fritz-PlayAI", speakByDefault: false });
+  });
+
+  it("merges partial voice config over defaults", () => {
+    const cfg = validateConfig({ workerUrl: "https://w.test", voice: { ttsVoice: "Arista-PlayAI" } } as any);
+    expect(cfg!.voice.ttsVoice).toBe("Arista-PlayAI");
+    expect(cfg!.voice.enabled).toBe(true);
+  });
 });
