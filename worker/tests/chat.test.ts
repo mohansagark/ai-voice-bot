@@ -143,3 +143,42 @@ describe("/chat (SSE + session memory)", () => {
     expect(seen.length).toBe(0);   // no model call -> no tokens
   });
 });
+
+describe("/chat dev mode (guards bypassed)", () => {
+  const devEnv = { GROQ_API_KEY: "x", WEBHOOK_URL: "https://hook.test/x", ALLOWED_ORIGINS: "https://devmohan.in", MODE: "dev" } as unknown as Env;
+
+  it("allows a disallowed origin in dev", async () => {
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["hi"], { reply: "hi", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    const req = new Request("https://w/chat", { method: "POST", headers: { origin: "https://evil.example", "content-type": "application/json" }, body: JSON.stringify({ session_id: "s1", message: "hi" }) });
+    const res = await app.fetch(req, devEnv);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("text/event-stream");
+  });
+
+  it("allows an over-long message in dev", async () => {
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["hi"], { reply: "hi", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    const res = await app.fetch(chatReq({ session_id: "s1", message: "a".repeat(3000) }), devEnv);
+    expect(res.status).toBe(200);
+  });
+
+  it("responds normally to a blocked session in dev (spam guard off)", async () => {
+    const map = new Map<string, SessionState>([["s1", { messages: [], lead: {}, leadSaved: false, turns: 2, blocked: true }]]);
+    const getSession = (_e: Env, id: string): SessionHandle => ({ load: async () => map.get(id)!, save: async (s) => void map.set(id, s) });
+    const { seen, makeRunner } = fakeRunnerFactory(["hi"], { reply: "hi", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    const res = await app.fetch(chatReq({ session_id: "s1", message: "hi" }), devEnv);
+    expect(res.status).toBe(200);
+    expect(seen.length).toBe(1);   // the model WAS called (guard bypassed)
+  });
+
+  it("/health reports the mode", async () => {
+    const prod = await createApp().fetch(new Request("https://w/health"), env);
+    expect((await prod.json() as any).mode).toBe("prod");
+    const dev = await createApp().fetch(new Request("https://w/health"), devEnv);
+    expect((await dev.json() as any).mode).toBe("dev");
+  });
+});

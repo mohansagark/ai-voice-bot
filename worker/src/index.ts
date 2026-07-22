@@ -25,8 +25,8 @@ export interface Deps {
   makeRunner: (graph: ReturnType<typeof buildGraph>) => GraphRunner;
 }
 
-function corsHeaders(origin: string, allowed: string[]): Record<string, string> {
-  const ok = allowed.length === 0 || allowed.includes(origin);
+function corsHeaders(origin: string, allowed: string[], allowAll = false): Record<string, string> {
+  const ok = allowAll || allowed.length === 0 || allowed.includes(origin);
   return {
     "access-control-allow-origin": ok && origin ? origin : "null",
     "access-control-allow-methods": "POST, GET, OPTIONS",
@@ -44,27 +44,28 @@ export function createApp(
       const url = new URL(request.url);
       const config: AppConfig = loadConfig(env);
       const origin = request.headers.get("origin") || "";
-      const cors = corsHeaders(origin, config.allowedOrigins);
+      const enforce = config.mode === "prod";
+      const cors = corsHeaders(origin, config.allowedOrigins, !enforce);
 
       if (request.method === "OPTIONS") return new Response(null, { headers: cors });
 
       if (url.pathname === "/health") {
         const p = config.providers[config.defaultProvider];
         return Response.json(
-          { ok: true, provider: config.defaultProvider, model: p?.model, tts: "browser", leads: env.WEBHOOK_URL ? "webhook" : "none" },
+          { ok: true, provider: config.defaultProvider, model: p?.model, tts: "browser", leads: env.WEBHOOK_URL ? "webhook" : "none", mode: config.mode },
           { headers: cors },
         );
       }
 
       if (url.pathname === "/chat" && request.method === "POST") {
-        if (config.allowedOrigins.length && !config.allowedOrigins.includes(origin)) {
+        if (enforce && config.allowedOrigins.length && !config.allowedOrigins.includes(origin)) {
           return Response.json({ error: "origin not allowed" }, { status: 403, headers: cors });
         }
         const body = (await request.json().catch(() => null)) as ChatBody | null;
         if (!body?.session_id || !body?.message) {
           return Response.json({ error: "session_id and message are required" }, { status: 400, headers: cors });
         }
-        if (body.message.length > config.maxMessageChars) {
+        if (enforce && body.message.length > config.maxMessageChars) {
           return Response.json({ error: "message too long" }, { status: 413, headers: cors });
         }
 
@@ -75,15 +76,15 @@ export function createApp(
 
         const BLOCK_MSG = "Looks like we're going in circles — I'm going to pause here. If you've got a real question, please reach out to Mohan directly.";
         // Already blocked earlier this session → go silent (no message, no LLM). Cheapest possible.
-        if (state.blocked) return Response.json({ blocked: true }, { status: 429, headers: cors });
+        if (enforce && state.blocked) return Response.json({ blocked: true }, { status: 429, headers: cors });
         // Fresh spam trip: deliver the pause line ONCE, then the session is silent from here on.
         const userMsgs = [...state.messages.filter((m) => m.role === "human").map((m) => m.content), body.message];
-        if (isSpam(userMsgs)) {
+        if (enforce && isSpam(userMsgs)) {
           try { await handle.save({ ...state, blocked: true }); } catch { /* best-effort */ }
           return blockedResponse(cors, BLOCK_MSG);
         }
 
-        if (state.turns + 1 > config.maxTurnsPerSession) {
+        if (enforce && state.turns + 1 > config.maxTurnsPerSession) {
           return Response.json({ error: "too many turns" }, { status: 429, headers: cors });
         }
         const turns = state.turns + 1;

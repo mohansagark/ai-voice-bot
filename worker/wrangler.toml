@@ -8,6 +8,7 @@ ALLOWED_ORIGINS = ""
 DEFAULT_PROVIDER = "groq"
 MAX_MESSAGE_CHARS = "2000"
 MAX_TURNS_PER_SESSION = "30"
+MODE = "prod"
 
 [[durable_objects.bindings]]
 name = "SESSION_DO"

@@ -16,6 +16,7 @@ export interface AppConfig {
   allowedOrigins: string[];
   maxMessageChars: number;
   maxTurnsPerSession: number;
+  mode: "dev" | "prod";
 }
 
 export interface Env {
@@ -26,6 +27,7 @@ export interface Env {
   DEFAULT_PROVIDER?: string;
   MAX_MESSAGE_CHARS?: string;
   MAX_TURNS_PER_SESSION?: string;
+  MODE?: string;
   SESSION_DO: DurableObjectNamespace;
 }
 
@@ -61,6 +63,7 @@ export function loadConfig(env: Env): AppConfig {
       .split(",").map((s) => s.trim()).filter(Boolean),
     maxMessageChars: Number(env.MAX_MESSAGE_CHARS || "2000"),
     maxTurnsPerSession: Number(env.MAX_TURNS_PER_SESSION || "30"),
+    mode: env.MODE === "dev" ? "dev" : "prod",
   };
 }
 
