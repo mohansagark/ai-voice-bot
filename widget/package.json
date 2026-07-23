@@ -1,12 +1,43 @@
 {
   "name": "ai-voice-bot-widget",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Embeddable, Shadow-DOM-isolated chat + voice widget (tap-to-talk, neural TTS) for the AI Voice Bot agent. Zero runtime deps, ~5.5 KB gzipped.",
   "type": "module",
+  "main": "dist/ai-voice-bot.min.js",
+  "unpkg": "dist/ai-voice-bot.min.js",
+  "jsdelivr": "dist/ai-voice-bot.min.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "node build.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mohansagark/ai-voice-bot.git",
+    "directory": "widget"
+  },
+  "homepage": "https://github.com/mohansagark/ai-voice-bot/tree/main/widget#readme",
+  "bugs": "https://github.com/mohansagark/ai-voice-bot/issues",
+  "keywords": [
+    "chat-widget",
+    "voice-assistant",
+    "embeddable-widget",
+    "shadow-dom",
+    "speech-recognition",
+    "text-to-speech",
+    "langgraph"
+  ],
+  "author": "Mohansagar",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
   },
   "devDependencies": {
     "esbuild": "^0.23.0",

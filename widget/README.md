@@ -26,6 +26,16 @@ npm run build      # -> dist/ai-voice-bot.min.js
 ## Embed on a site
 ```html
 <script>window.AiVoiceBotConfig = { workerUrl: "https://voicebot.devmohan.in", /* branding, privacy, ... */ };</script>
-<script src="https://cdn.jsdelivr.net/npm/ai-voice-bot-widget/dist/ai-voice-bot.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/ai-voice-bot-widget@0.1.0/dist/ai-voice-bot.min.js" defer></script>
 ```
-(npm/CDN publish lands in v0.3; until then use the locally-built `dist/ai-voice-bot.min.js`.)
+Pin a version (`@0.1.0`) for reproducible embeds, or drop the version for jsDelivr's latest.
+Published on npm as [`ai-voice-bot-widget`](https://www.npmjs.com/package/ai-voice-bot-widget).
+
+## Publishing (maintainer notes)
+```bash
+cd widget
+npm login              # once, if not already
+npm publish            # runs typecheck + test + build via prepublishOnly, then publishes
+```
+jsDelivr and unpkg mirror npm automatically — no separate CDN step needed. Bump `version` in
+`package.json` (and the CDN URL above) before each publish.

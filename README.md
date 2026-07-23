@@ -26,7 +26,7 @@ time).
 | v0.2a | Backend streaming + memory hardening (dev/prod mode switch, operational guards). |
 | v0.2b | The embeddable widget: Shadow DOM shell, orb + chat panel, SSE streaming client, consent gate, session/name persistence. |
 | v0.2c | **Voice**: tap-to-talk mic (browser `SpeechRecognition`) and spoken replies (Groq neural TTS → browser `speechSynthesis` → silent fallback), with a mute toggle and calm, opt-in voice UX. |
-| v0.3 (next) | npm/CDN publish + deploy to `voicebot.devmohan.in` + embed on `devmohan.in`. |
+| v0.3 (in progress) | npm/CDN publish (done — [`ai-voice-bot-widget`](https://www.npmjs.com/package/ai-voice-bot-widget)) + deploy to `voicebot.devmohan.in` + embed on `devmohan.in`. |
 
 ## Quickstart
 
