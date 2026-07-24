@@ -4,9 +4,9 @@ type OrbState = "idle" | "thinking" | "listening" | "speaking";
 const STATES: OrbState[] = ["idle", "thinking", "listening", "speaking"];
 
 export function wireOrb(refs: Refs, onToggle?: (open: boolean) => void) {
-  const setOpen = (open: boolean) => {
+  const setOpen = (open: boolean, focus = true) => {
     refs.panel.setAttribute("data-open", String(open));
-    if (open) refs.input.focus();
+    if (open && focus) refs.input.focus();
     onToggle?.(open);
   };
   const isOpen = () => refs.panel.getAttribute("data-open") === "true";
@@ -30,7 +30,7 @@ export function wireOrb(refs: Refs, onToggle?: (open: boolean) => void) {
   };
 
   return {
-    open: () => setOpen(true),
+    open: (opts?: { focus?: boolean }) => setOpen(true, opts?.focus ?? true),
     close: () => setOpen(false),
     toggle: () => setOpen(!isOpen()),
     isOpen,

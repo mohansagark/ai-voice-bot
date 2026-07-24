@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mountShell } from "../src/dom";
 import { wireOrb } from "../src/orb";
 import { DEFAULTS } from "../src/config";
@@ -16,6 +16,22 @@ describe("wireOrb", () => {
     expect(orb.isOpen()).toBe(true);
     (refs.panel.querySelector(".close") as HTMLButtonElement).click();
     expect(refs.panel.getAttribute("data-open")).toBe("false");
+  });
+
+  it("open({ focus: false }) opens the panel without focusing the input; open() with no args still focuses it", () => {
+    const refs = mountShell(cfg);
+    const orb = wireOrb(refs);
+    const focusSpy = vi.fn();
+    refs.input.focus = focusSpy;
+
+    orb.open({ focus: false });
+    expect(refs.panel.getAttribute("data-open")).toBe("true");
+    expect(focusSpy).not.toHaveBeenCalled();
+
+    orb.close();
+    orb.open();
+    expect(refs.panel.getAttribute("data-open")).toBe("true");
+    expect(focusSpy).toHaveBeenCalledTimes(1);
   });
 
   it("setThinking swaps the orb state class", () => {
