@@ -60,13 +60,13 @@ export function css(theme: string, theme2: string): string {
   .mic.listening .mic-halo { display: block; }
   .mic.listening .mic-bars { display: flex; }
   .input-wrap { position: relative; flex: 1; }
-  .waveform { display: none; align-items: center; gap: 2px; height: 38px; padding: 0 4px; overflow: hidden; }
+  .waveform { display: none; align-items: center; justify-content: space-between; height: 38px; padding: 0 4px; overflow: hidden; }
   .waveform span { width: 2px; border-radius: 1px; background: ${theme}; flex-shrink: 0; }
   form.listening .input-wrap input { display: none; }
   form.listening .input-wrap .waveform { display: flex; }
   .send { background: linear-gradient(120deg, ${theme}, ${theme2}); border: none; border-radius: 10px; width: 42px; height: 38px; flex-shrink: 0; display: grid; place-items: center; cursor: pointer; }
   .send svg { width: 18px; height: 18px; color: #fff; }
-  .list { flex: 1; overflow-y: auto; scroll-behavior: smooth; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .list { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
   .msg { max-width: 82%; padding: 9px 12px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
   .msg.bot { background: #241f30; align-self: flex-start; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
   .msg.user { background: linear-gradient(120deg, ${theme}, ${theme2}); color: #fff; align-self: flex-end; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
@@ -86,6 +86,6 @@ export function css(theme: string, theme2: string): string {
   input { width: 100%; padding: 10px 12px; border: 1px solid #332d42; background: #241f30; color: #eae7f2; border-radius: 10px; font-size: 14px; }
   input::placeholder { color: #756e8a; }
   input:focus-visible { outline: 2px solid ${theme}; outline-offset: 1px; }
-  @media (prefers-reduced-motion: reduce) { .orb.idle { animation: none; } .orb.thinking::after { animation-duration: 1.6s; } .orb.listening, .orb.speaking { animation: none; } .msg-enter { animation: none; } .typing span { animation: none; } .list { scroll-behavior: auto; } }
+  @media (prefers-reduced-motion: reduce) { .orb.idle { animation: none; } .orb.thinking::after { animation-duration: 1.6s; } .orb.listening, .orb.speaking { animation: none; } .msg-enter { animation: none; } .typing span { animation: none; } }
   `;
 }
