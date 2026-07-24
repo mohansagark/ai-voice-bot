@@ -56,6 +56,15 @@ describe("createVisualizer", () => {
     expect(stopCalls).toEqual([true, true]);
   });
 
+  it("releases the acquired mic stream if a later acquisition step throws (e.g. AudioContext construction fails)", async () => {
+    const stopCalls: boolean[] = [];
+    const getUserMedia = async () => ({ getTracks: () => [{ stop: () => stopCalls.push(true) }] }) as unknown as MediaStream;
+    const AudioContextCtor = vi.fn(() => { throw new Error("AudioContext construction failed"); }) as unknown as new () => any;
+    const v = createVisualizer(() => {}, { getUserMedia, AudioContextCtor, requestFrame: () => 1, cancelFrame: () => {} });
+    await expect(v.start()).resolves.toBeUndefined();
+    expect(stopCalls).toEqual([true]);
+  });
+
   it("start() is idempotent — a second call while already running does not re-acquire the mic", async () => {
     let calls = 0;
     const getUserMedia = async () => { calls++; return { getTracks: () => [] } as unknown as MediaStream; };

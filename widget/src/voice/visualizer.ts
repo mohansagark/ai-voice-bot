@@ -28,6 +28,12 @@ export function createVisualizer(onLevel: (level: number) => void, deps: Visuali
   const requestFrame = deps.requestFrame ?? ((cb) => requestAnimationFrame(cb));
   const cancelFrame = deps.cancelFrame ?? ((h) => cancelAnimationFrame(h));
 
+  function releaseAcquired(): void {
+    stream?.getTracks().forEach((t) => t.stop());
+    stream = null;
+    if (ctx) { try { ctx.close(); } catch { /* ignore */ } ctx = null; }
+  }
+
   return {
     async start(): Promise<void> {
       if (running) return;
@@ -52,15 +58,14 @@ export function createVisualizer(onLevel: (level: number) => void, deps: Visuali
         };
         tick();
       } catch {
+        releaseAcquired(); // don't orphan a partially-acquired stream/context on later-step failure
         running = false; // fail silently (never throw into host); a later start() may retry
       }
     },
     stop(): void {
       running = false;
       if (frameHandle !== null) { cancelFrame(frameHandle); frameHandle = null; }
-      stream?.getTracks().forEach((t) => t.stop());
-      stream = null;
-      if (ctx) { try { ctx.close(); } catch { /* ignore */ } ctx = null; }
+      releaseAcquired();
     },
   };
 }
