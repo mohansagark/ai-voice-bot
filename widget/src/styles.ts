@@ -4,19 +4,27 @@ export function css(theme: string, theme2: string): string {
   * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   .orb {
     position: fixed; bottom: 20px; z-index: 2147483000;
-    width: 56px; height: 56px; border-radius: 22px; border: none; cursor: pointer;
-    background: linear-gradient(120deg, ${theme}, ${theme2}); color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.28);
+    width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer;
+    background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 45%), linear-gradient(135deg, ${theme2}, ${theme});
+    color: #fff;
+    box-shadow: 0 6px 24px rgba(0,0,0,.28), inset -5px -5px 10px rgba(0,0,0,.3), inset 4px 4px 8px rgba(255,255,255,.15);
     display: grid; place-items: center; transition: transform .15s ease;
   }
   .orb:hover { transform: scale(1.05); }
   .orb:focus-visible { outline: 3px solid ${theme}; outline-offset: 3px; }
   .orb.pos-right { right: 20px; } .orb.pos-left { left: 20px; }
-  @keyframes avb-pulse { 0%,100% { box-shadow: 0 6px 24px rgba(0,0,0,.28); } 50% { box-shadow: 0 6px 30px ${theme}66; } }
+  @keyframes avb-pulse {
+    0%,100% { box-shadow: 0 6px 24px rgba(0,0,0,.28), inset -5px -5px 10px rgba(0,0,0,.3), inset 4px 4px 8px rgba(255,255,255,.15); }
+    50% { box-shadow: 0 6px 30px ${theme}66, inset -5px -5px 10px rgba(0,0,0,.3), inset 4px 4px 8px rgba(255,255,255,.15); }
+  }
   .orb.idle { animation: avb-pulse 2.4s ease-in-out infinite; }
   @keyframes avb-spin { to { transform: rotate(360deg); } }
   .orb.thinking::after { content:""; width:22px; height:22px; border:3px solid #ffffff55; border-top-color:#fff; border-radius:50%; animation: avb-spin .8s linear infinite; }
   .orb.thinking svg { display: none; }
-  @keyframes avb-listen { 0%,100% { box-shadow: 0 6px 24px rgba(0,0,0,.28); } 50% { box-shadow: 0 0 0 8px ${theme}33; } }
+  @keyframes avb-listen {
+    0%,100% { box-shadow: 0 6px 24px rgba(0,0,0,.28), inset -5px -5px 10px rgba(0,0,0,.3), inset 4px 4px 8px rgba(255,255,255,.15); }
+    50% { box-shadow: 0 0 0 8px ${theme}33, inset -5px -5px 10px rgba(0,0,0,.3), inset 4px 4px 8px rgba(255,255,255,.15); }
+  }
   .orb.listening { animation: avb-listen 1.2s ease-in-out infinite; }
   @keyframes avb-speak { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
   .orb.speaking { animation: avb-speak .6s ease-in-out infinite; }
@@ -29,24 +37,28 @@ export function css(theme: string, theme2: string): string {
   }
   .panel.pos-right { right: 20px; } .panel.pos-left { left: 20px; }
   .panel[data-open="true"] { display: flex; }
-  .hd { position: relative; background: linear-gradient(120deg, ${theme}, ${theme2}); padding: 14px 16px 26px; }
+  .hd { background: linear-gradient(120deg, ${theme}, ${theme2}); padding: 14px 16px; }
   .hd-top { display: flex; align-items: center; justify-content: space-between; }
-  .hd-top span { color: #fff; font-weight: 600; }
+  .hd-identity { display: flex; align-items: center; gap: 8px; }
+  .hd-identity span { color: #fff; font-weight: 600; }
   .hd button { background: transparent; border: none; color: #fff; font-size: 20px; cursor: pointer; line-height: 1; }
   .hd-actions { display: flex; align-items: center; gap: 2px; }
-  .avatar { position: absolute; left: 16px; bottom: -16px; width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(120deg, ${theme}, ${theme2}); box-shadow: 0 4px 10px rgba(0,0,0,.35); display: grid; place-items: center; }
-  .avatar svg { width: 20px; height: 20px; }
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.5) 0%, rgba(255,255,255,0) 45%), linear-gradient(135deg, ${theme2}, ${theme});
+    box-shadow: 0 2px 6px rgba(0,0,0,.35), inset -3px -3px 6px rgba(0,0,0,.3), inset 2px 2px 5px rgba(255,255,255,.15);
+    display: grid; place-items: center;
+  }
+  .avatar svg { width: 16px; height: 16px; }
   form .mic { background: transparent; border: 1px solid #332d42; color: #eae7f2; border-radius: 10px; padding: 8px 10px; cursor: pointer; font-size: 16px; }
   form .mic:disabled { opacity: .4; cursor: not-allowed; }
   form .mic.listening { border-color: ${theme}; }
-  .list { flex: 1; overflow-y: auto; scroll-behavior: smooth; padding: 26px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .list { flex: 1; overflow-y: auto; scroll-behavior: smooth; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
   .msg { max-width: 82%; padding: 9px 12px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
   .msg.bot { background: #241f30; align-self: flex-start; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
   .msg.user { background: linear-gradient(120deg, ${theme}, ${theme2}); color: #fff; align-self: flex-end; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
   .msg.note { align-self: center; background: transparent; color: #8a85a0; font-size: 12px; padding: 2px; }
   .msg-text { display: block; }
-  .ts { display: block; margin-top: 4px; font-size: 11px; color: #756e8a; }
-  .msg.user .ts { text-align: right; color: rgba(255,255,255,.75); }
   .typing { display: inline-flex; gap: 4px; padding: 2px 0; }
   .typing span { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .5; animation: avb-bounce 1s infinite ease-in-out; }
   .typing span:nth-child(2) { animation-delay: .15s; }

@@ -90,16 +90,6 @@ describe("wirePanel", () => {
     expect(msg.classList.contains("msg-enter")).toBe(true);
   });
 
-  it("renders a timestamp on user and bot messages, but not on notes", () => {
-    const refs = mountShell(cfg);
-    const p = wirePanel(refs);
-    p.addUser("hi");
-    p.note("✓ sent to Mohan");
-    const userMsg = refs.list.querySelector(".msg.user")!;
-    const noteMsg = refs.list.querySelector(".msg.note")!;
-    expect(userMsg.querySelector(".ts")).toBeTruthy();
-    expect(noteMsg.querySelector(".ts")).toBeNull();
-  });
 });
 
 describe("shouldPinToBottom", () => {

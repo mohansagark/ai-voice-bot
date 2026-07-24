@@ -33,13 +33,15 @@ export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.bod
   panel.innerHTML = `
     <div class="hd">
       <div class="hd-top">
-        <span>${escapeHtml(cfg.branding.botName)}</span>
+        <div class="hd-identity">
+          <div class="avatar">${botGlyphSvg()}</div>
+          <span>${escapeHtml(cfg.branding.botName)}</span>
+        </div>
         <div class="hd-actions">
           <button type="button" class="sound" aria-label="Mute ${escapeHtml(cfg.branding.botName)}'s voice" aria-pressed="false">🔊</button>
           <button class="close" aria-label="Close">×</button>
         </div>
       </div>
-      <div class="avatar">${botGlyphSvg()}</div>
     </div>
     <div class="list"></div>
     <form>

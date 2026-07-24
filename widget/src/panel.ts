@@ -1,10 +1,6 @@
 import type { Refs } from "./dom";
 import type { WidgetConfig } from "./types";
 
-function formatTime(d: Date): string {
-  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
 export function shouldPinToBottom(scrollHeight: number, scrollTop: number, clientHeight: number, threshold = 32): boolean {
   return scrollHeight - scrollTop - clientHeight <= threshold;
 }
@@ -25,12 +21,6 @@ export function wirePanel(refs: Refs) {
       body.textContent = text;
     }
     d.appendChild(body);
-    if (cls === "user" || cls === "bot") {
-      const ts = document.createElement("span");
-      ts.className = "ts";
-      ts.textContent = formatTime(new Date());
-      d.appendChild(ts);
-    }
     refs.list.appendChild(d);
     if (pin) scrollToBottom();
     return d;
