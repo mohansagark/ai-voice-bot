@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from "vitest";
 import { mountShell } from "../src/dom";
-import { wirePanel } from "../src/panel";
+import { wirePanel, shouldPinToBottom } from "../src/panel";
 import { DEFAULTS } from "../src/config";
 
 const cfg = { workerUrl: "https://w.test", ...DEFAULTS } as any;
@@ -99,5 +99,50 @@ describe("wirePanel", () => {
     const noteMsg = refs.list.querySelector(".msg.note")!;
     expect(userMsg.querySelector(".ts")).toBeTruthy();
     expect(noteMsg.querySelector(".ts")).toBeNull();
+  });
+});
+
+describe("shouldPinToBottom", () => {
+  it("is true when the scroll position is within the threshold of the bottom", () => {
+    expect(shouldPinToBottom(500, 195, 300)).toBe(true);  // distance = 5
+    expect(shouldPinToBottom(500, 168, 300)).toBe(true);  // distance = 32 (exactly at threshold)
+  });
+  it("is false when scrolled further up than the threshold", () => {
+    expect(shouldPinToBottom(500, 0, 300)).toBe(false);   // distance = 200
+    expect(shouldPinToBottom(500, 167, 300)).toBe(false); // distance = 33
+  });
+});
+
+function stubScroll(list: HTMLElement, vals: { scrollHeight: number; scrollTop: number; clientHeight: number }) {
+  Object.defineProperty(list, "scrollHeight", { value: vals.scrollHeight, configurable: true });
+  Object.defineProperty(list, "scrollTop", { value: vals.scrollTop, configurable: true, writable: true });
+  Object.defineProperty(list, "clientHeight", { value: vals.clientHeight, configurable: true });
+}
+
+describe("wirePanel — scroll pinning", () => {
+  it("auto-scrolls to bottom when near-bottom before a new bot token arrives", () => {
+    const refs = mountShell(cfg);
+    const p = wirePanel(refs);
+    const bot = p.startBot();
+    stubScroll(refs.list, { scrollHeight: 500, scrollTop: 195, clientHeight: 300 }); // near bottom
+    p.appendBot(bot, "hi");
+    expect(refs.list.scrollTop).toBe(refs.list.scrollHeight);
+  });
+
+  it("does not force-scroll when the visitor has scrolled up to read history", () => {
+    const refs = mountShell(cfg);
+    const p = wirePanel(refs);
+    const bot = p.startBot();
+    stubScroll(refs.list, { scrollHeight: 500, scrollTop: 0, clientHeight: 300 }); // scrolled to top
+    p.appendBot(bot, "hi");
+    expect(refs.list.scrollTop).toBe(0); // untouched
+  });
+
+  it("always scrolls to bottom when the visitor sends their own message, even if scrolled up", () => {
+    const refs = mountShell(cfg);
+    const p = wirePanel(refs);
+    stubScroll(refs.list, { scrollHeight: 500, scrollTop: 0, clientHeight: 300 });
+    p.addUser("hello");
+    expect(refs.list.scrollTop).toBe(refs.list.scrollHeight);
   });
 });

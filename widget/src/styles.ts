@@ -39,7 +39,7 @@ export function css(theme: string, theme2: string): string {
   form .mic { background: transparent; border: 1px solid #332d42; color: #eae7f2; border-radius: 10px; padding: 8px 10px; cursor: pointer; font-size: 16px; }
   form .mic:disabled { opacity: .4; cursor: not-allowed; }
   form .mic.listening { border-color: ${theme}; }
-  .list { flex: 1; overflow-y: auto; padding: 26px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .list { flex: 1; overflow-y: auto; scroll-behavior: smooth; padding: 26px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
   .msg { max-width: 82%; padding: 9px 12px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
   .msg.bot { background: #241f30; align-self: flex-start; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
   .msg.user { background: linear-gradient(120deg, ${theme}, ${theme2}); color: #fff; align-self: flex-end; box-shadow: 0 2px 8px rgba(0,0,0,.3); }

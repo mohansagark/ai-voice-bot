@@ -5,9 +5,16 @@ function formatTime(d: Date): string {
   return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
 
+export function shouldPinToBottom(scrollHeight: number, scrollTop: number, clientHeight: number, threshold = 32): boolean {
+  return scrollHeight - scrollTop - clientHeight <= threshold;
+}
+
 export function wirePanel(refs: Refs) {
-  const scroll = () => { refs.list.scrollTop = refs.list.scrollHeight; };
+  const isPinned = () => shouldPinToBottom(refs.list.scrollHeight, refs.list.scrollTop, refs.list.clientHeight);
+  const scrollToBottom = () => { refs.list.scrollTop = refs.list.scrollHeight; };
+
   const line = (cls: string, text = ""): HTMLElement => {
+    const pin = cls === "user" || isPinned();
     const d = document.createElement("div");
     d.className = `msg ${cls} msg-enter`;
     const body = document.createElement("span");
@@ -24,7 +31,8 @@ export function wirePanel(refs: Refs) {
       ts.textContent = formatTime(new Date());
       d.appendChild(ts);
     }
-    refs.list.appendChild(d); scroll();
+    refs.list.appendChild(d);
+    if (pin) scrollToBottom();
     return d;
   };
   return {
@@ -32,15 +40,17 @@ export function wirePanel(refs: Refs) {
     startBot: (): HTMLElement => line("bot", ""),
     startBotText: (text: string) => void line("bot", text),
     appendBot: (el: HTMLElement, text: string) => {
+      const pin = isPinned();
       const body = el.querySelector(".msg-text")!;
       body.textContent = (body.textContent ?? "") + text;
-      scroll();
+      if (pin) scrollToBottom();
     },
     endBot: (el: HTMLElement, finalText?: string) => {
+      const pin = isPinned();
       const body = el.querySelector(".msg-text")!;
       if (finalText) body.textContent = finalText;
       else if (!body.textContent) body.textContent = "…";
-      scroll();
+      if (pin) scrollToBottom();
     },
     note: (text: string) => void line("note", text),
     showError: () => void line("bot", "Hmm, something hiccuped — mind trying that again?"),
@@ -54,6 +64,7 @@ export function wirePanel(refs: Refs) {
       });
     },
     showConsent: (cfg: WidgetConfig, onAgree: () => void) => {
+      const pin = isPinned();
       const box = document.createElement("div");
       box.className = "consent";
       const url = cfg.privacy.privacyPolicyUrl;
@@ -62,7 +73,8 @@ export function wirePanel(refs: Refs) {
         ? ` <a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener">Privacy</a>`
         : "";
       box.innerHTML = `<div>${escapeHtml(cfg.privacy.consentText)}${link}</div><button type="button">Got it</button>`;
-      refs.list.appendChild(box); scroll();
+      refs.list.appendChild(box);
+      if (pin) scrollToBottom();
       box.querySelector("button")!.addEventListener("click", () => { box.remove(); onAgree(); });
     },
     clearConsent: () => refs.list.querySelector(".consent")?.remove(),
