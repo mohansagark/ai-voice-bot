@@ -173,6 +173,12 @@ and Firefox, where the mic button is disabled with a tooltip and text chat still
 Spoken replies try your Worker's neural TTS first, fall back to the browser's `speechSynthesis`,
 then fall back to silent (the text reply is always shown regardless).
 
+**Conversation mode**: tap the mic once to start a hands-free back-and-forth — after each reply is
+generated and (if speaking) fully spoken, the mic listens again automatically. Tap the mic again,
+any time, to stop. While listening, the mic button shows a live, mic-volume-reactive animation and
+the text input becomes a waveform line; both fall back gracefully (no animation, capture still
+works) if the browser can't provide raw mic-level access.
+
 ---
 
 ## Troubleshooting
