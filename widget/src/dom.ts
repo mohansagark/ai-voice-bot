@@ -3,7 +3,7 @@ import { css } from "./styles";
 
 export interface Refs {
   host: HTMLElement; shadow: ShadowRoot;
-  orb: HTMLButtonElement; panel: HTMLElement; header: HTMLElement;
+  orb: HTMLButtonElement; panel: HTMLElement; header: HTMLElement; avatar: HTMLElement;
   list: HTMLElement; form: HTMLFormElement; input: HTMLInputElement;
   mic: HTMLButtonElement; sound: HTMLButtonElement;
 }
@@ -32,11 +32,14 @@ export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.bod
   panel.setAttribute("aria-label", `Chat with ${cfg.branding.botName}`);
   panel.innerHTML = `
     <div class="hd">
-      <span>${escapeHtml(cfg.branding.botName)}</span>
-      <div class="hd-actions">
-        <button type="button" class="sound" aria-label="Mute ${escapeHtml(cfg.branding.botName)}'s voice" aria-pressed="false">🔊</button>
-        <button class="close" aria-label="Close">×</button>
+      <div class="hd-top">
+        <span>${escapeHtml(cfg.branding.botName)}</span>
+        <div class="hd-actions">
+          <button type="button" class="sound" aria-label="Mute ${escapeHtml(cfg.branding.botName)}'s voice" aria-pressed="false">🔊</button>
+          <button class="close" aria-label="Close">×</button>
+        </div>
       </div>
+      <div class="avatar">${botGlyphSvg()}</div>
     </div>
     <div class="list"></div>
     <form>
@@ -50,6 +53,7 @@ export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.bod
   return {
     host, shadow, orb, panel,
     header: panel.querySelector(".hd")!,
+    avatar: panel.querySelector(".avatar")!,
     list: panel.querySelector(".list")!,
     form: panel.querySelector("form")!,
     input: panel.querySelector("input")!,

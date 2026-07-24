@@ -39,4 +39,11 @@ describe("mountShell", () => {
     expect(refs.orb.querySelector("svg.orb-icon")).toBeTruthy();
     expect(refs.orb.textContent?.trim()).toBe(""); // no emoji text content anymore
   });
+
+  it("mounts an avatar badge with the bot-glyph icon in the header", () => {
+    const refs = mountShell(cfg);
+    expect(refs.avatar).toBeTruthy();
+    expect(refs.shadow.contains(refs.avatar)).toBe(true);
+    expect(refs.avatar.querySelector("svg.orb-icon")).toBeTruthy();
+  });
 });
