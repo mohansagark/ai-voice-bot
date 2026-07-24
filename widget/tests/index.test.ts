@@ -200,6 +200,45 @@ describe("mount", () => {
     }
   });
 
+  it("conversation mode: a stalled speech (never reaches idle) is recovered by the watchdog after 15s", async () => {
+    class FakeRecognition {
+      static last: FakeRecognition | null = null;
+      lang = ""; continuous = true; interimResults = true;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      startCalls = 0;
+      constructor() { FakeRecognition.last = this; }
+      start() { this.startCalls++; }
+      stop() {}
+    }
+    (window as any).SpeechRecognition = FakeRecognition;
+    vi.useFakeTimers();
+    try {
+      const fetchImpl = (async (url: string) => {
+        if (String(url).endsWith("/tts")) return new Response("audio", { status: 200 });
+        return streamRes([sse("done", { reply: "Hey there", lead_saved: false })]);
+      }) as unknown as typeof fetch;
+      // No makeAudio and no synth injected: the neural TTS response never becomes a
+      // playable audio element with onended, and there's no browser-speech fallback --
+      // so speaker's onState never reaches "idle" (verified directly against voice/tts.ts).
+      const app = mount(baseCfg, { store: memoryStore(), fetchImpl, synth: null })!;
+      app.refs.orb.click();
+      app.refs.mic.click(); // conversation mode on — tap 1
+      const rec = FakeRecognition.last!;
+      expect(rec.startCalls).toBe(1);
+      rec.onresult!({ results: [[{ transcript: "what do you do" }]] });
+      (app.refs.list.querySelector(".consent button") as HTMLButtonElement).click(); // first message still gates on consent
+      await vi.advanceTimersByTimeAsync(0); // let the streamed reply's onDone fire
+      expect(rec.startCalls).toBe(1); // stalled: awaitingSpeechEnd is true but onState never reaches "idle"
+      await vi.advanceTimersByTimeAsync(15000); // watchdog fires
+      expect(rec.startCalls).toBe(2); // watchdog recovered listening without a manual toggle
+    } finally {
+      vi.useRealTimers();
+      delete (window as any).SpeechRecognition;
+    }
+  });
+
   it("conversation mode: an empty/no-speech result keeps listening without going through send()", () => {
     class FakeRecognition {
       static last: FakeRecognition | null = null;

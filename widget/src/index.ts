@@ -41,7 +41,15 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
     let conversationMode = false;
     let awaitingReply = false;
     let awaitingSpeechEnd = false;
+    let speechWatchdog: ReturnType<typeof setTimeout> | null = null;
     let soundOn = session.soundOn(cfg.voice.speakByDefault);
+
+    const clearSpeechWatchdog = () => {
+      if (speechWatchdog !== null) {
+        clearTimeout(speechWatchdog);
+        speechWatchdog = null;
+      }
+    };
 
     const speaker = cfg.voice.enabled
       ? createSpeaker(
@@ -72,6 +80,7 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
     speaker?.onState((s) => {
       orb.setSpeaking(s === "speaking");
       if (s === "idle" && awaitingSpeechEnd) {
+        clearSpeechWatchdog();
         awaitingSpeechEnd = false;
         if (conversationMode) startListening();
       }
@@ -118,6 +127,17 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
             awaitingReply = false;
             if (shouldSpeak(voiceInitiated, soundOn) && speaker) {
               awaitingSpeechEnd = true;
+              clearSpeechWatchdog();
+              // Watchdog: if speaker's onState never reaches "idle" (e.g. neural TTS
+              // failed AND the browser speechSynthesis fallback is unavailable), don't
+              // let conversation mode stall forever waiting for a signal that never comes.
+              speechWatchdog = setTimeout(() => {
+                clearSpeechWatchdog();
+                if (awaitingSpeechEnd) {
+                  awaitingSpeechEnd = false;
+                  if (conversationMode) startListening();
+                }
+              }, 15000);
               speaker.speak(reply); // fire-and-forget; onState("idle") above triggers the restart
             } else if (conversationMode) {
               startListening();
@@ -205,13 +225,19 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
       refs.mic.disabled = true;
       refs.mic.title = "voice input isn't available in this browser — type instead";
     } else {
+      refs.mic.setAttribute("aria-pressed", "false");
       refs.mic.addEventListener("click", () => {
         if (conversationMode) {
           conversationMode = false;
-          if (listening) { try { recognizer!.stop(); } catch { /* onEnd still fires and cleans up */ } }
+          refs.mic.setAttribute("aria-pressed", String(conversationMode));
+          if (listening) {
+            try { recognizer!.stop(); } catch { /* onEnd still fires and cleans up */ }
+            stopListeningVisual(); // don't rely solely on onEnd to stop the mic visualizer
+          }
           return;
         }
         conversationMode = true;
+        refs.mic.setAttribute("aria-pressed", String(conversationMode));
         startListening();
       });
     }
