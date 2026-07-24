@@ -61,4 +61,21 @@ describe("session", () => {
     s.forget();
     expect(s.soundOn(false)).toBe(false);
   });
+
+  it("tracks whether the visitor has ever been greeted before, defaulting to false", () => {
+    const store = memoryStore();
+    const s = createSession(store);
+    expect(s.hasVisitedBefore()).toBe(false);
+    s.markVisited();
+    expect(s.hasVisitedBefore()).toBe(true);
+    expect(createSession(store).hasVisitedBefore()).toBe(true); // persists across a fresh createSession() call
+  });
+
+  it("forget() also clears the visited flag", () => {
+    const store = memoryStore();
+    const s = createSession(store);
+    s.markVisited();
+    s.forget();
+    expect(s.hasVisitedBefore()).toBe(false);
+  });
 });

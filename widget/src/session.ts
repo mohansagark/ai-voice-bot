@@ -1,7 +1,7 @@
 export interface Store { get(k: string): string | null; set(k: string, v: string): void; remove(k: string): void; }
 export interface Consent { agreed: true; timestamp: string; text: string; }
 
-const K_ID = "avb_session", K_NAME = "avb_name", K_CONSENT = "avb_consent", K_SOUND = "avb_sound";
+const K_ID = "avb_session", K_NAME = "avb_name", K_CONSENT = "avb_consent", K_SOUND = "avb_sound", K_VISITED = "avb_visited";
 
 export function memoryStore(): Store {
   const m = new Map<string, string>();
@@ -47,6 +47,8 @@ export function createSession(store: Store) {
       return raw === null ? defaultValue : raw === "1";
     },
     setSoundOn: (v: boolean) => store.set(K_SOUND, v ? "1" : "0"),
-    forget: () => { store.remove(K_ID); store.remove(K_NAME); store.remove(K_CONSENT); store.remove(K_SOUND); },
+    hasVisitedBefore: (): boolean => store.get(K_VISITED) === "1",
+    markVisited: (): void => store.set(K_VISITED, "1"),
+    forget: () => { store.remove(K_ID); store.remove(K_NAME); store.remove(K_CONSENT); store.remove(K_SOUND); store.remove(K_VISITED); },
   };
 }
