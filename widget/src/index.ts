@@ -10,6 +10,7 @@ import { sttSupported, createRecognizer } from "./voice/stt";
 import { createSpeaker, shouldSpeak, type SynthLike, type AudioLike } from "./voice/tts";
 import { createVisualizer, type VisualizerDeps } from "./voice/visualizer";
 import { applyLevel } from "./voice/level-render";
+import { speakGreetingOnInteraction, type InteractionDeps } from "./voice/greet-on-interaction";
 
 export interface MountDeps {
   store?: Store;
@@ -20,7 +21,11 @@ export interface MountDeps {
   AudioContextCtor?: VisualizerDeps["AudioContextCtor"];
   requestFrame?: VisualizerDeps["requestFrame"];
   cancelFrame?: VisualizerDeps["cancelFrame"];
+  userActivation?: InteractionDeps["userActivation"];
+  interactionAddEventListener?: InteractionDeps["addEventListener"];
 }
+
+const PROACTIVE_OPEN_DELAY_MS = 1800;
 
 export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } | null {
   const cfg: WidgetConfig | null = validateConfig(rawConfig);
@@ -77,6 +82,18 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
         }
       }
     });
+    if (cfg.behavior.autoGreet && cfg.behavior.proactiveGreet && !session.hasVisitedBefore()) {
+      session.markVisited();
+      setTimeout(() => {
+        orb.open({ focus: false });
+        if (cfg.voice.enabled && speaker) {
+          speakGreetingOnInteraction(() => { void speaker!.speak(cfg.branding.greeting); }, {
+            userActivation: deps.userActivation,
+            addEventListener: deps.interactionAddEventListener,
+          });
+        }
+      }, PROACTIVE_OPEN_DELAY_MS);
+    }
     speaker?.onState((s) => {
       orb.setSpeaking(s === "speaking");
       if (s === "idle" && awaitingSpeechEnd) {

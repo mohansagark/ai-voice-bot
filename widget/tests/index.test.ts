@@ -293,6 +293,44 @@ describe("mount", () => {
     }
   });
 
+  it("first-time visitor: auto-opens the panel and speaks the greeting after a delay, regardless of the mute default", async () => {
+    vi.useFakeTimers();
+    try {
+      const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
+      const fetchImpl = (async (url: string) => {
+        if (String(url).endsWith("/tts")) return new Response("audio", { status: 200 });
+        throw new Error("chat should not be called by the proactive greeting");
+      }) as unknown as typeof fetch;
+      const app = mount(baseCfg, {
+        store: memoryStore(),
+        fetchImpl,
+        makeAudio: () => audio,
+        userActivation: { hasBeenActive: true },
+      } as any)!;
+      expect(app.refs.panel.getAttribute("data-open")).toBe("false"); // not yet — delay hasn't elapsed
+      await vi.advanceTimersByTimeAsync(1800);
+      expect(app.refs.panel.getAttribute("data-open")).toBe("true");
+      expect(app.refs.list.textContent).toContain("Hi there!"); // baseCfg's greeting text
+      await vi.advanceTimersByTimeAsync(0); // let the queued speak()'s fetch/play chain settle
+      expect(audio.played).toBe(true); // spoke despite speakByDefault:false/soundOn default being off
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("returning visitor: does not auto-open (avb_visited already set)", async () => {
+    vi.useFakeTimers();
+    try {
+      const store = memoryStore();
+      store.set("avb_visited", "1");
+      const app = mount(baseCfg, { store, fetchImpl: fetch } as any)!;
+      await vi.advanceTimersByTimeAsync(5000); // well past the 1800ms delay
+      expect(app.refs.panel.getAttribute("data-open")).toBe("false");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("sound toggle flips aria-pressed (muted state, not raw soundOn) and persists across remounts", () => {
     const store = memoryStore();
     const app1 = mount(baseCfg, { store, fetchImpl: fetch })!;
