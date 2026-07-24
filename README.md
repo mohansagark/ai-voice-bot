@@ -15,8 +15,10 @@ time).
   `POST /tts` (Groq neural text-to-speech). See `worker/` for local dev/test commands.
 - **`widget/`** — the frontend: a self-mounting, embeddable chat widget (`<script>` tag, zero
   runtime deps, ~5.5 KB gzipped) that renders inside a Shadow DOM so it can't be affected by —
-  or leak into — a host page's styles. See [`widget/README.md`](widget/README.md) for build,
-  test, and embed instructions.
+  or leak into — a host page's styles. Published on npm as
+  [`ai-voice-bot-widget`](https://www.npmjs.com/package/ai-voice-bot-widget). See
+  [`widget/README.md`](widget/README.md) for **activating it on any website** (your own backend +
+  script tag), the full config reference, and dev/build/publish instructions.
 
 ## Features by version
 
@@ -26,7 +28,7 @@ time).
 | v0.2a | Backend streaming + memory hardening (dev/prod mode switch, operational guards). |
 | v0.2b | The embeddable widget: Shadow DOM shell, orb + chat panel, SSE streaming client, consent gate, session/name persistence. |
 | v0.2c | **Voice**: tap-to-talk mic (browser `SpeechRecognition`) and spoken replies (Groq neural TTS → browser `speechSynthesis` → silent fallback), with a mute toggle and calm, opt-in voice UX. |
-| v0.3 (in progress) | npm/CDN publish (done — [`ai-voice-bot-widget`](https://www.npmjs.com/package/ai-voice-bot-widget)) + deploy to `voicebot.devmohan.in` + embed on `devmohan.in`. |
+| v0.3 (in progress) | npm/CDN publish (done — [`ai-voice-bot-widget`](https://www.npmjs.com/package/ai-voice-bot-widget)) + deploy to `voicebot.devmohan.in` (done) + embed on `devmohan.in`. |
 
 ## Quickstart
 
@@ -41,7 +43,7 @@ npm run dev                      # wrangler dev on http://localhost:8787
 Add `MODE=dev` to `worker/.dev.vars` to bypass the origin/rate/spam guards while testing locally.
 Get a free Groq key at [console.groq.com](https://console.groq.com); a free lead webhook at
 [formspree.io](https://formspree.io). To hear Leo's neural voice, also accept the `playai-tts`
-model's terms once in the Groq console (see [`widget/README.md`](widget/README.md#voice-v02c) —
+model's terms once in the Groq console (see [`widget/README.md`](widget/README.md#configuration-reference) —
 without it, `/tts` fails gracefully and the widget falls back to browser text-to-speech).
 
 **2. Build and open the widget:**
