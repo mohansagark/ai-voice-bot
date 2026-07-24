@@ -29,6 +29,13 @@ describe("validateConfig", () => {
     expect(cfg!.voice).toEqual({ enabled: true, ttsVoice: "hannah", speakByDefault: false });
   });
 
+  it("defaults proactiveGreet to true and allows disabling it", () => {
+    const cfg = validateConfig({ workerUrl: "https://w.test" });
+    expect(cfg!.behavior.proactiveGreet).toBe(true);
+    const disabled = validateConfig({ workerUrl: "https://w.test", behavior: { proactiveGreet: false } } as any);
+    expect(disabled!.behavior.proactiveGreet).toBe(false);
+  });
+
   it("merges partial voice config over defaults", () => {
     const cfg = validateConfig({ workerUrl: "https://w.test", voice: { ttsVoice: "hannah" } } as any);
     expect(cfg!.voice.ttsVoice).toBe("hannah");

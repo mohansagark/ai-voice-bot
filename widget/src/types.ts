@@ -1,7 +1,7 @@
 export interface WidgetConfig {
   workerUrl: string;
   branding: { botName: string; themeColor: string; themeColorSecondary: string; position: "bottom-right" | "bottom-left"; greeting: string };
-  behavior: { autoGreet: boolean; rememberReturning: boolean; language: string };
+  behavior: { autoGreet: boolean; rememberReturning: boolean; language: string; proactiveGreet: boolean };
   privacy: { consentText: string; privacyPolicyUrl: string | null };
   advanced: { analyticsCallback: ((event: string, payload?: unknown) => void) | null };
   voice: { enabled: boolean; ttsVoice: string; speakByDefault: boolean };
