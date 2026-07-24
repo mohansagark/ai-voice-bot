@@ -331,6 +331,33 @@ describe("mount", () => {
     }
   });
 
+  it("pre-existing visitor with a stored name (migration case): speaks 'Welcome back' without auto-opening the panel", async () => {
+    vi.useFakeTimers();
+    try {
+      const store = memoryStore();
+      store.set("avb_name", "Mohan"); // existing visitor from before this feature shipped — has a name, but avb_visited was never set
+      let ttsBody: string | null = null;
+      const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
+      const fetchImpl = (async (url: string, init?: RequestInit) => {
+        if (String(url).endsWith("/tts")) { ttsBody = String(init?.body); return new Response("audio", { status: 200 }); }
+        throw new Error("chat should not be called by the proactive greeting");
+      }) as unknown as typeof fetch;
+      const app = mount(baseCfg, {
+        store,
+        fetchImpl,
+        makeAudio: () => audio,
+        userActivation: { hasBeenActive: true },
+      } as any)!;
+      await vi.advanceTimersByTimeAsync(1800);
+      expect(app.refs.panel.getAttribute("data-open")).toBe("false"); // does NOT auto-open for a known returning visitor
+      await vi.advanceTimersByTimeAsync(0);
+      expect(audio.played).toBe(true); // still proactively speaks
+      expect(ttsBody).toContain("Welcome back, Mohan!"); // the returning-visitor text, not the generic greeting
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("sound toggle flips aria-pressed (muted state, not raw soundOn) and persists across remounts", () => {
     const store = memoryStore();
     const app1 = mount(baseCfg, { store, fetchImpl: fetch })!;

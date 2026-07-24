@@ -72,22 +72,26 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
       { getUserMedia: deps.getUserMedia, AudioContextCtor: deps.AudioContextCtor, requestFrame: deps.requestFrame, cancelFrame: deps.cancelFrame },
     );
 
+    const greetingTextFor = (name: string | null): string =>
+      name ? `Welcome back, ${name}! What can I help with?` : cfg.branding.greeting;
+
     const orb = wireOrb(refs, (open) => {
       if (open) {
         emit(analytics, "open");
         if (!greeted && cfg.behavior.autoGreet) {
           const name = cfg.behavior.rememberReturning ? session.name() : null;
-          panel.startBotText(name ? `Welcome back, ${name}! What can I help with?` : cfg.branding.greeting);
+          panel.startBotText(greetingTextFor(name));
           greeted = true;
         }
       }
     });
     if (cfg.behavior.autoGreet && cfg.behavior.proactiveGreet && !session.hasVisitedBefore()) {
       session.markVisited();
+      const knownName = cfg.behavior.rememberReturning ? session.name() : null;
       setTimeout(() => {
-        orb.open({ focus: false });
+        if (!knownName) orb.open({ focus: false });
         if (cfg.voice.enabled && speaker) {
-          speakGreetingOnInteraction(() => { void speaker!.speak(cfg.branding.greeting); }, {
+          speakGreetingOnInteraction(() => { void speaker!.speak(greetingTextFor(knownName)); }, {
             userActivation: deps.userActivation,
             addEventListener: deps.interactionAddEventListener,
           });
