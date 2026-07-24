@@ -8,12 +8,18 @@ import { sendChat } from "./client";
 import { emit } from "./analytics";
 import { sttSupported, createRecognizer } from "./voice/stt";
 import { createSpeaker, shouldSpeak, type SynthLike, type AudioLike } from "./voice/tts";
+import { createVisualizer, type VisualizerDeps } from "./voice/visualizer";
+import { applyLevel } from "./voice/level-render";
 
 export interface MountDeps {
   store?: Store;
   fetchImpl?: typeof fetch;
   synth?: SynthLike | null;
   makeAudio?: (res: Response) => AudioLike | Promise<AudioLike>;
+  getUserMedia?: VisualizerDeps["getUserMedia"];
+  AudioContextCtor?: VisualizerDeps["AudioContextCtor"];
+  requestFrame?: VisualizerDeps["requestFrame"];
+  cancelFrame?: VisualizerDeps["cancelFrame"];
 }
 
 export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } | null {
@@ -32,6 +38,9 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
     let consentPending = false;
     let pendingVoice = false;
     let listening = false;
+    let conversationMode = false;
+    let awaitingReply = false;
+    let awaitingSpeechEnd = false;
     let soundOn = session.soundOn(cfg.voice.speakByDefault);
 
     const speaker = cfg.voice.enabled
@@ -45,6 +54,11 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
         )
       : null;
 
+    const visualizer = createVisualizer(
+      (level) => applyLevel(refs, level),
+      { getUserMedia: deps.getUserMedia, AudioContextCtor: deps.AudioContextCtor, requestFrame: deps.requestFrame, cancelFrame: deps.cancelFrame },
+    );
+
     const orb = wireOrb(refs, (open) => {
       if (open) {
         emit(analytics, "open");
@@ -55,13 +69,16 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
         }
       }
     });
-    speaker?.onState((s) => orb.setSpeaking(s === "speaking"));
+    speaker?.onState((s) => {
+      orb.setSpeaking(s === "speaking");
+      if (s === "idle" && awaitingSpeechEnd) {
+        awaitingSpeechEnd = false;
+        if (conversationMode) startListening();
+      }
+    });
 
     const renderSound = () => {
       refs.sound.textContent = soundOn ? "🔊" : "🔇";
-      // aria-pressed reflects whether the "mute" action is currently active
-      // (i.e. muted), matching the button's "Mute {botName}'s voice" label —
-      // not the raw soundOn flag, which is inverted from that.
       refs.sound.setAttribute("aria-pressed", String(!soundOn));
       refs.sound.setAttribute(
         "aria-label",
@@ -79,6 +96,7 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
 
     const send = (text: string, voiceInitiated = false) => {
       emit(analytics, "message", { text, voiceInitiated });
+      awaitingSpeechEnd = false; // cancel any pending restart tied to a previous, now-stale turn
       speaker?.stop();
       panel.addUser(text);
       orb.setThinking(true);
@@ -97,10 +115,24 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
           onDone: (reply) => {
             panel.endBot(line, reply);
             orb.setThinking(false);
-            if (shouldSpeak(voiceInitiated, soundOn)) speaker?.speak(reply);
+            awaitingReply = false;
+            if (shouldSpeak(voiceInitiated, soundOn) && speaker) {
+              awaitingSpeechEnd = true;
+              speaker.speak(reply); // fire-and-forget; onState("idle") above triggers the restart
+            } else if (conversationMode) {
+              startListening();
+            }
           },
-          onError: () => { line.remove(); panel.showError(); orb.setThinking(false); emit(analytics, "error"); },
-          onBlocked: () => { line.remove(); orb.setThinking(false); emit(analytics, "blocked"); },
+          onError: () => {
+            line.remove(); panel.showError(); orb.setThinking(false); emit(analytics, "error");
+            awaitingReply = false;
+            if (conversationMode) startListening();
+          },
+          onBlocked: () => {
+            line.remove(); orb.setThinking(false); emit(analytics, "blocked");
+            awaitingReply = false;
+            if (conversationMode) startListening();
+          },
         },
         fetchImpl,
       );
@@ -115,21 +147,55 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
       panel.showConsent(cfg, () => { consentPending = false; session.setConsent(cfg.privacy.consentText); send(text, voiceInitiated); });
     });
 
+    const setListeningVisual = (on: boolean) => {
+      orb.setListening(on);
+      refs.form.classList.toggle("listening", on);
+      refs.mic.classList.toggle("listening", on);
+    };
+
     let recognizer: { start(): void; stop(): void } | null = null;
+
+    const startListening = () => {
+      if (listening || !recognizer) return;
+      listening = true;
+      setListeningVisual(true);
+      visualizer.start();
+      try {
+        recognizer.start();
+      } catch {
+        listening = false;
+        setListeningVisual(false);
+        visualizer.stop();
+      }
+    };
+
+    const stopListeningVisual = () => {
+      listening = false;
+      setListeningVisual(false);
+      visualizer.stop();
+    };
+
     const canUseMic = cfg.voice.enabled && sttSupported();
     if (canUseMic) {
       try {
         recognizer = createRecognizer(cfg.behavior.language, {
           onResult: (text) => {
+            stopListeningVisual();
             const t = text.trim();
-            orb.setListening(false);
-            if (!t) return;
+            if (!t) { if (conversationMode) startListening(); return; }
+            awaitingReply = true;
             refs.input.value = t;
             pendingVoice = true;
             refs.form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
           },
-          onEnd: () => { listening = false; orb.setListening(false); },
-          onError: () => { listening = false; orb.setListening(false); },
+          onEnd: () => {
+            stopListeningVisual();
+            if (conversationMode && !awaitingReply) startListening();
+          },
+          onError: () => {
+            stopListeningVisual();
+            if (conversationMode && !awaitingReply) startListening();
+          },
         });
       } catch {
         recognizer = null;
@@ -140,15 +206,13 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
       refs.mic.title = "voice input isn't available in this browser — type instead";
     } else {
       refs.mic.addEventListener("click", () => {
-        if (listening) return; // already listening — ignore the repeat tap
-        listening = true;
-        orb.setListening(true);
-        try {
-          recognizer!.start();
-        } catch {
-          listening = false;
-          orb.setListening(false);
+        if (conversationMode) {
+          conversationMode = false;
+          if (listening) { try { recognizer!.stop(); } catch { /* onEnd still fires and cleans up */ } }
+          return;
         }
+        conversationMode = true;
+        startListening();
       });
     }
 

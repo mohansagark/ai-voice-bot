@@ -104,7 +104,103 @@ describe("mount", () => {
     }
   });
 
-  it("tap-to-talk: a second mic tap while still listening does not call start() again", () => {
+  it("tap-to-talk: a second mic tap while listening turns conversation mode off (stops the recognizer)", () => {
+    class FakeRecognition {
+      static last: FakeRecognition | null = null;
+      lang = ""; continuous = true; interimResults = true;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      startCalls = 0; stopCalls = 0;
+      constructor() { FakeRecognition.last = this; }
+      start() { this.startCalls++; }
+      stop() { this.stopCalls++; }
+    }
+    (window as any).SpeechRecognition = FakeRecognition;
+    try {
+      const app = mount(baseCfg, { store: memoryStore(), fetchImpl: fetch })!;
+      app.refs.mic.click(); // first tap — conversation mode on, starts listening
+      expect(FakeRecognition.last!.startCalls).toBe(1);
+      expect(app.refs.orb.classList.contains("listening")).toBe(true);
+      app.refs.mic.click(); // second tap — turns conversation mode off
+      expect(FakeRecognition.last!.stopCalls).toBe(1);
+      expect(FakeRecognition.last!.startCalls).toBe(1); // still just the one start
+    } finally {
+      delete (window as any).SpeechRecognition;
+    }
+  });
+
+  it("conversation mode: after Leo's reply is generated and spoken, listening restarts automatically (no new tap)", async () => {
+    class FakeRecognition {
+      static last: FakeRecognition | null = null;
+      lang = ""; continuous = true; interimResults = true;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      startCalls = 0;
+      constructor() { FakeRecognition.last = this; }
+      start() { this.startCalls++; }
+      stop() {}
+    }
+    (window as any).SpeechRecognition = FakeRecognition;
+    try {
+      const fetchImpl = (async (url: string) => {
+        if (String(url).endsWith("/tts")) return new Response("audio", { status: 200 });
+        return streamRes([sse("done", { reply: "Hey there", lead_saved: false })]);
+      }) as unknown as typeof fetch;
+      const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
+      const app = mount(baseCfg, { store: memoryStore(), fetchImpl, makeAudio: () => audio })!;
+      app.refs.orb.click();
+      app.refs.mic.click(); // conversation mode on — tap 1
+      const rec = FakeRecognition.last!;
+      expect(rec.startCalls).toBe(1);
+      rec.onresult!({ results: [[{ transcript: "what do you do" }]] });
+      (app.refs.list.querySelector(".consent button") as HTMLButtonElement).click(); // first message still gates on consent
+      await new Promise((r) => setTimeout(r, 0));
+      expect(audio.played).toBe(true); // Leo is "speaking" the reply
+      expect(rec.startCalls).toBe(1); // not yet restarted — still waiting for speech to finish
+      audio.onended!(); // playback finishes -> speaker's onState fires "idle"
+      expect(rec.startCalls).toBe(2); // listening restarted automatically, no new tap
+    } finally {
+      delete (window as any).SpeechRecognition;
+    }
+  });
+
+  it("conversation mode: tapping the mic off before the reply finishes speaking prevents the auto-restart", async () => {
+    class FakeRecognition {
+      static last: FakeRecognition | null = null;
+      lang = ""; continuous = true; interimResults = true;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      startCalls = 0; stopCalls = 0;
+      constructor() { FakeRecognition.last = this; }
+      start() { this.startCalls++; }
+      stop() { this.stopCalls++; }
+    }
+    (window as any).SpeechRecognition = FakeRecognition;
+    try {
+      const fetchImpl = (async (url: string) => {
+        if (String(url).endsWith("/tts")) return new Response("audio", { status: 200 });
+        return streamRes([sse("done", { reply: "Hey there", lead_saved: false })]);
+      }) as unknown as typeof fetch;
+      const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
+      const app = mount(baseCfg, { store: memoryStore(), fetchImpl, makeAudio: () => audio })!;
+      app.refs.orb.click();
+      app.refs.mic.click(); // conversation mode on
+      const rec = FakeRecognition.last!;
+      rec.onresult!({ results: [[{ transcript: "what do you do" }]] });
+      (app.refs.list.querySelector(".consent button") as HTMLButtonElement).click();
+      await new Promise((r) => setTimeout(r, 0));
+      app.refs.mic.click(); // taps off while Leo is still "speaking"
+      audio.onended!(); // playback finishes after the tap-off
+      expect(rec.startCalls).toBe(1); // no auto-restart — conversation mode was already off
+    } finally {
+      delete (window as any).SpeechRecognition;
+    }
+  });
+
+  it("conversation mode: an empty/no-speech result keeps listening without going through send()", () => {
     class FakeRecognition {
       static last: FakeRecognition | null = null;
       lang = ""; continuous = true; interimResults = true;
@@ -119,13 +215,12 @@ describe("mount", () => {
     (window as any).SpeechRecognition = FakeRecognition;
     try {
       const app = mount(baseCfg, { store: memoryStore(), fetchImpl: fetch })!;
-      expect(app.refs.mic.disabled).toBe(false);
-      app.refs.mic.click(); // first tap — starts listening
-      expect(FakeRecognition.last!.startCalls).toBe(1);
-      expect(app.refs.orb.classList.contains("listening")).toBe(true);
-      // second tap before onresult/onend/onerror fires — the first session is still "running"
       app.refs.mic.click();
-      expect(FakeRecognition.last!.startCalls).toBe(1); // guarded: start() was not called again
+      const rec = FakeRecognition.last!;
+      expect(rec.startCalls).toBe(1);
+      rec.onresult!({ results: [[{ transcript: "   " }]] }); // whitespace-only -> treated as empty
+      expect(rec.startCalls).toBe(2); // restarted immediately, no send() involved
+      expect(app.refs.list.children.length).toBe(0); // nothing was sent/rendered
     } finally {
       delete (window as any).SpeechRecognition;
     }
