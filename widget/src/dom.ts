@@ -5,7 +5,8 @@ export interface Refs {
   host: HTMLElement; shadow: ShadowRoot;
   orb: HTMLButtonElement; panel: HTMLElement; header: HTMLElement; avatar: HTMLElement;
   list: HTMLElement; form: HTMLFormElement; input: HTMLInputElement;
-  mic: HTMLButtonElement; sound: HTMLButtonElement;
+  mic: HTMLButtonElement; micHalo: HTMLElement; micBars: HTMLElement; waveform: HTMLElement;
+  sound: HTMLButtonElement;
 }
 
 export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.body): Refs {
@@ -30,6 +31,7 @@ export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.bod
   panel.setAttribute("data-open", "false");
   panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-label", `Chat with ${cfg.branding.botName}`);
+  const waveformBars = Array.from({ length: 24 }, () => "<span></span>").join("");
   panel.innerHTML = `
     <div class="hd">
       <div class="hd-top">
@@ -45,9 +47,18 @@ export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.bod
     </div>
     <div class="list"></div>
     <form>
-      <input type="text" placeholder="Type a message…" autocomplete="off" aria-label="Message" />
-      <button type="button" class="mic" aria-label="Speak your message">🎤</button>
-      <button type="submit">Send</button>
+      <button type="button" class="mic" aria-label="Speak your message">
+        <span class="mic-icon">🎤</span>
+        <span class="mic-halo"></span>
+        <span class="mic-bars"><span></span><span></span><span></span></span>
+      </button>
+      <div class="input-wrap">
+        <input type="text" placeholder="Type a message…" autocomplete="off" aria-label="Message" />
+        <div class="waveform" aria-hidden="true">${waveformBars}</div>
+      </div>
+      <button type="submit" class="send" aria-label="Send message">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 11.5L20 4L12.5 21L10.5 13.5L3 11.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="none"/></svg>
+      </button>
     </form>
   `;
   shadow.appendChild(panel);
@@ -60,6 +71,9 @@ export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.bod
     form: panel.querySelector("form")!,
     input: panel.querySelector("input")!,
     mic: panel.querySelector(".mic")!,
+    micHalo: panel.querySelector(".mic-halo")!,
+    micBars: panel.querySelector(".mic-bars")!,
+    waveform: panel.querySelector(".waveform")!,
     sound: panel.querySelector(".sound")!,
   };
 }

@@ -46,4 +46,22 @@ describe("mountShell", () => {
     expect(refs.shadow.contains(refs.avatar)).toBe(true);
     expect(refs.avatar.querySelector("svg.orb-icon")).toBeTruthy();
   });
+
+  it("mounts mic visual elements (halo + 3 bars) and a 24-bar input waveform, inside the shadow root", () => {
+    const refs = mountShell(cfg);
+    expect(refs.micHalo).toBeTruthy();
+    expect(refs.micBars).toBeTruthy();
+    expect(refs.waveform).toBeTruthy();
+    expect(refs.shadow.contains(refs.micHalo)).toBe(true);
+    expect(refs.shadow.contains(refs.waveform)).toBe(true);
+    expect(refs.micBars.querySelectorAll("span").length).toBe(3);
+    expect(refs.waveform.querySelectorAll("span").length).toBe(24);
+  });
+
+  it("renders the Send button as an icon only, no text label", () => {
+    const refs = mountShell(cfg);
+    const send = refs.form.querySelector("button[type=submit]")!;
+    expect(send.querySelector("svg")).toBeTruthy();
+    expect(send.textContent?.trim()).toBe("");
+  });
 });
