@@ -221,24 +221,31 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
         recognizer = null;
       }
     }
+    const stopConversationMode = () => {
+      conversationMode = false;
+      refs.mic.setAttribute("aria-pressed", "false");
+      if (listening) {
+        try { recognizer!.stop(); } catch { /* onEnd still fires and cleans up */ }
+        stopListeningVisual(); // don't rely solely on onEnd to stop the mic visualizer
+      }
+    };
+
     if (!recognizer) {
       refs.mic.disabled = true;
       refs.mic.title = "voice input isn't available in this browser — type instead";
     } else {
       refs.mic.setAttribute("aria-pressed", "false");
       refs.mic.addEventListener("click", () => {
-        if (conversationMode) {
-          conversationMode = false;
-          refs.mic.setAttribute("aria-pressed", String(conversationMode));
-          if (listening) {
-            try { recognizer!.stop(); } catch { /* onEnd still fires and cleans up */ }
-            stopListeningVisual(); // don't rely solely on onEnd to stop the mic visualizer
-          }
-          return;
-        }
+        if (conversationMode) { stopConversationMode(); return; }
         conversationMode = true;
         refs.mic.setAttribute("aria-pressed", String(conversationMode));
         startListening();
+      });
+      // A backgrounded tab left in conversation mode holds the mic (Chrome's
+      // SpeechRecognition only supports one active session per browser process),
+      // silently starving any other tab's attempt to listen. Release it on hide.
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && conversationMode) stopConversationMode();
       });
     }
 

@@ -130,6 +130,34 @@ describe("mount", () => {
     }
   });
 
+  it("backgrounding the tab while listening releases the mic (avoids starving other tabs of the one active recognition session)", () => {
+    class FakeRecognition {
+      static last: FakeRecognition | null = null;
+      lang = ""; continuous = true; interimResults = true;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      startCalls = 0; stopCalls = 0;
+      constructor() { FakeRecognition.last = this; }
+      start() { this.startCalls++; }
+      stop() { this.stopCalls++; }
+    }
+    (window as any).SpeechRecognition = FakeRecognition;
+    try {
+      const app = mount(baseCfg, { store: memoryStore(), fetchImpl: fetch })!;
+      app.refs.mic.click(); // conversation mode on, starts listening
+      expect(app.refs.mic.getAttribute("aria-pressed")).toBe("true");
+      Object.defineProperty(document, "hidden", { value: true, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+      expect(FakeRecognition.last!.stopCalls).toBe(1);
+      expect(app.refs.mic.getAttribute("aria-pressed")).toBe("false");
+      expect(app.refs.orb.classList.contains("listening")).toBe(false);
+    } finally {
+      delete (window as any).SpeechRecognition;
+      Object.defineProperty(document, "hidden", { value: false, configurable: true });
+    }
+  });
+
   it("conversation mode: after Leo's reply is generated and spoken, listening restarts automatically (no new tap)", async () => {
     class FakeRecognition {
       static last: FakeRecognition | null = null;
