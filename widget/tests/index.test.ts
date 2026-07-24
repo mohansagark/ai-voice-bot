@@ -358,6 +358,35 @@ describe("mount", () => {
     }
   });
 
+  it("returning visitor without a stored name (consented/chatted before, but never gave a name): speaks 'Welcome back!' with no name, without auto-opening the panel", async () => {
+    vi.useFakeTimers();
+    try {
+      const store = memoryStore();
+      // Has chatted before (consent was recorded), but never gave a name — distinct from a brand-new visitor.
+      store.set("avb_consent", JSON.stringify({ agreed: true, timestamp: new Date().toISOString(), text: "ok" }));
+      let ttsBody: string | null = null;
+      const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
+      const fetchImpl = (async (url: string, init?: RequestInit) => {
+        if (String(url).endsWith("/tts")) { ttsBody = String(init?.body); return new Response("audio", { status: 200 }); }
+        throw new Error("chat should not be called by the proactive greeting");
+      }) as unknown as typeof fetch;
+      const app = mount(baseCfg, {
+        store,
+        fetchImpl,
+        makeAudio: () => audio,
+        userActivation: { hasBeenActive: true },
+      } as any)!;
+      await vi.advanceTimersByTimeAsync(1800);
+      expect(app.refs.panel.getAttribute("data-open")).toBe("false"); // does NOT auto-open for a returning visitor
+      await vi.advanceTimersByTimeAsync(0);
+      expect(audio.played).toBe(true); // still proactively speaks
+      expect(ttsBody).toContain("Welcome back! What can I help with?"); // no name interpolated
+      expect(ttsBody).not.toContain("Welcome back,"); // must not read like a name was about to follow
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("sound toggle flips aria-pressed (muted state, not raw soundOn) and persists across remounts", () => {
     const store = memoryStore();
     const app1 = mount(baseCfg, { store, fetchImpl: fetch })!;

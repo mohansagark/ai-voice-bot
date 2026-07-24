@@ -72,8 +72,13 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
       { getUserMedia: deps.getUserMedia, AudioContextCtor: deps.AudioContextCtor, requestFrame: deps.requestFrame, cancelFrame: deps.cancelFrame },
     );
 
+    // A visitor who has consented/chatted before but never gave a name is still a
+    // returning visitor, distinct from a brand-new one — just not one we can greet by name.
+    const isReturningVisitor = cfg.behavior.rememberReturning && session.consent() !== null;
     const greetingTextFor = (name: string | null): string =>
-      name ? `Welcome back, ${name}! What can I help with?` : cfg.branding.greeting;
+      name ? `Welcome back, ${name}! What can I help with?`
+        : isReturningVisitor ? "Welcome back! What can I help with?"
+        : cfg.branding.greeting;
 
     const orb = wireOrb(refs, (open) => {
       if (open) {
@@ -89,7 +94,7 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
       session.markVisited();
       const knownName = cfg.behavior.rememberReturning ? session.name() : null;
       setTimeout(() => {
-        if (!knownName) orb.open({ focus: false });
+        if (!knownName && !isReturningVisitor) orb.open({ focus: false });
         if (cfg.voice.enabled && speaker) {
           speakGreetingOnInteraction(() => { void speaker!.speak(greetingTextFor(knownName)); }, {
             userActivation: deps.userActivation,
