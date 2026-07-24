@@ -62,6 +62,6 @@ export function css(theme: string, theme2: string): string {
   input::placeholder { color: #756e8a; }
   input:focus-visible { outline: 2px solid ${theme}; outline-offset: 1px; }
   form button { background: linear-gradient(120deg, ${theme}, ${theme2}); color: #fff; border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
-  @media (prefers-reduced-motion: reduce) { .orb.idle { animation: none; } .orb.thinking::after { animation-duration: 1.6s; } .orb.listening, .orb.speaking { animation: none; } .msg-enter { animation: none; } .typing span { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .orb.idle { animation: none; } .orb.thinking::after { animation-duration: 1.6s; } .orb.listening, .orb.speaking { animation: none; } .msg-enter { animation: none; } .typing span { animation: none; } .list { scroll-behavior: auto; } }
   `;
 }
