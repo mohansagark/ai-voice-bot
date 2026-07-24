@@ -12,7 +12,7 @@ export async function synthesizeSpeech(
     const res = await fetchImpl("https://api.groq.com/openai/v1/audio/speech", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: "playai-tts", voice, input: text, response_format: "wav" }),
+      body: JSON.stringify({ model: "canopylabs/orpheus-v1-english", voice, input: text, response_format: "wav" }),
     });
     if (!res.ok) return { ok: false, status: 502, error: `groq tts error ${res.status}` };
     const body = await res.arrayBuffer();

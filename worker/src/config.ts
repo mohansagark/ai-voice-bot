@@ -68,7 +68,7 @@ export function loadConfig(env: Env): AppConfig {
     maxMessageChars: Number(env.MAX_MESSAGE_CHARS || "2000"),
     maxTurnsPerSession: Number(env.MAX_TURNS_PER_SESSION || "30"),
     mode: env.MODE === "dev" ? "dev" : "prod",
-    ttsVoice: env.TTS_VOICE || "Fritz-PlayAI",
+    ttsVoice: env.TTS_VOICE || "troy",
     maxTtsChars: Number(env.MAX_TTS_CHARS || "1200"),
   };
 }

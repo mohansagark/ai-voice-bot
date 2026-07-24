@@ -26,12 +26,12 @@ describe("validateConfig", () => {
   it("fills voice + language defaults", () => {
     const cfg = validateConfig({ workerUrl: "https://w.test" });
     expect(cfg!.behavior.language).toBe("en-US");
-    expect(cfg!.voice).toEqual({ enabled: true, ttsVoice: "Fritz-PlayAI", speakByDefault: false });
+    expect(cfg!.voice).toEqual({ enabled: true, ttsVoice: "troy", speakByDefault: false });
   });
 
   it("merges partial voice config over defaults", () => {
-    const cfg = validateConfig({ workerUrl: "https://w.test", voice: { ttsVoice: "Arista-PlayAI" } } as any);
-    expect(cfg!.voice.ttsVoice).toBe("Arista-PlayAI");
+    const cfg = validateConfig({ workerUrl: "https://w.test", voice: { ttsVoice: "hannah" } } as any);
+    expect(cfg!.voice.ttsVoice).toBe("hannah");
     expect(cfg!.voice.enabled).toBe(true);
   });
 

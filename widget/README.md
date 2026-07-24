@@ -33,8 +33,10 @@ npm install
 You need:
 - A free [Cloudflare](https://dash.cloudflare.com) account (for `wrangler`, the Workers CLI).
 - A free **Groq API key** from [console.groq.com](https://console.groq.com) (powers the chat model
-  and, optionally, neural text-to-speech via the `playai-tts` model — accept that model's terms
-  once in the Groq console, or voice replies fall back to the browser's built-in TTS).
+  and, optionally, neural text-to-speech via the `canopylabs/orpheus-v1-english` model — accept
+  that model's terms once at
+  [console.groq.com/playground?model=canopylabs%2Forpheus-v1-english](https://console.groq.com/playground?model=canopylabs%2Forpheus-v1-english),
+  or voice replies fall back to the browser's built-in TTS).
 - A **lead webhook URL** to receive contact-form-style leads the agent captures — a free one from
   [formspree.io](https://formspree.io) works, or point it at your own endpoint (Zapier, a Worker,
   whatever accepts a `POST` with JSON).
@@ -152,7 +154,7 @@ window.AiVoiceBotConfig = {
 
   voice: {
     enabled: true,            // set false to disable mic + spoken replies entirely
-    ttsVoice: "Fritz-PlayAI", // must match a voice your Worker's TTS_VOICE/backend supports
+    ttsVoice: "troy",         // must match a voice your Worker's TTS_VOICE/backend supports
     speakByDefault: false,    // if true, Leo speaks replies to typed messages too, not just voice ones
   },
 
@@ -180,7 +182,7 @@ then fall back to silent (the text reply is always shown regardless).
 | `{"error":"origin not allowed"}` in the console/network tab | Your site's origin isn't in the Worker's `ALLOWED_ORIGINS` | Add it in `worker/wrangler.toml` and redeploy, or set `MODE=dev` for local testing |
 | Widget doesn't appear at all | `window.AiVoiceBotConfig` missing/typo'd, or set *after* the widget script ran | Check the browser console for a `[ai-voice-bot]` error; make sure the config `<script>` runs before the widget `<script>` |
 | Mic button greyed out | Browser doesn't support `SpeechRecognition` (Safari/Firefox), or `voice.enabled: false` | Expected in unsupported browsers — text still works. Check config if unintended |
-| No spoken reply, but text appears fine | `/tts` errored (missing/unaccepted Groq `playai-tts` terms) and browser TTS is also unavailable | Widget falls back silently by design — accept the model's terms in the Groq console, or ignore if browser TTS is acceptable |
+| No spoken reply, but text appears fine | `/tts` errored (missing/unaccepted Groq `canopylabs/orpheus-v1-english` terms) and browser TTS is also unavailable | Widget falls back silently by design — accept the model's terms in the Groq console, or ignore if browser TTS is acceptable |
 | Widget styling looks broken on host page | Shouldn't happen — it renders in a Shadow DOM | File an issue with a repro; this would be a widget bug |
 
 ---

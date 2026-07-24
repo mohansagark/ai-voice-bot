@@ -43,8 +43,10 @@ npm run dev                      # wrangler dev on http://localhost:8787
 ```
 Add `MODE=dev` to `worker/.dev.vars` to bypass the origin/rate/spam guards while testing locally.
 Get a free Groq key at [console.groq.com](https://console.groq.com); a free lead webhook at
-[formspree.io](https://formspree.io). To hear Leo's neural voice, also accept the `playai-tts`
-model's terms once in the Groq console (see [`widget/README.md`](widget/README.md#configuration-reference) —
+[formspree.io](https://formspree.io). To hear Leo's neural voice, also accept the
+`canopylabs/orpheus-v1-english` model's terms once in the
+[Groq console](https://console.groq.com/playground?model=canopylabs%2Forpheus-v1-english)
+(see [`widget/README.md`](widget/README.md#configuration-reference) —
 without it, `/tts` fails gracefully and the widget falls back to browser text-to-speech).
 
 **2. Build and open the widget:**
