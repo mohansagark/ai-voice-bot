@@ -33,4 +33,10 @@ describe("mountShell", () => {
     expect(refs.mic.getAttribute("type")).toBe("button");
     expect(refs.sound.getAttribute("aria-pressed")).toBe("false");
   });
+
+  it("renders a bot-glyph SVG icon in the orb instead of an emoji", () => {
+    const refs = mountShell(cfg);
+    expect(refs.orb.querySelector("svg.orb-icon")).toBeTruthy();
+    expect(refs.orb.textContent?.trim()).toBe(""); // no emoji text content anymore
+  });
 });

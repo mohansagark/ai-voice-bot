@@ -1,12 +1,12 @@
-export function css(theme: string): string {
+export function css(theme: string, theme2: string): string {
   return `
   :host { all: initial; }
   * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   .orb {
     position: fixed; bottom: 20px; z-index: 2147483000;
-    width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer;
-    background: ${theme}; color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.28);
-    display: grid; place-items: center; font-size: 24px; transition: transform .15s ease;
+    width: 56px; height: 56px; border-radius: 22px; border: none; cursor: pointer;
+    background: linear-gradient(120deg, ${theme}, ${theme2}); color: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.28);
+    display: grid; place-items: center; transition: transform .15s ease;
   }
   .orb:hover { transform: scale(1.05); }
   .orb:focus-visible { outline: 3px solid ${theme}; outline-offset: 3px; }
@@ -15,7 +15,7 @@ export function css(theme: string): string {
   .orb.idle { animation: avb-pulse 2.4s ease-in-out infinite; }
   @keyframes avb-spin { to { transform: rotate(360deg); } }
   .orb.thinking::after { content:""; width:22px; height:22px; border:3px solid #ffffff55; border-top-color:#fff; border-radius:50%; animation: avb-spin .8s linear infinite; }
-  .orb.thinking { font-size: 0; }
+  .orb.thinking svg { display: none; }
   @keyframes avb-listen { 0%,100% { box-shadow: 0 6px 24px rgba(0,0,0,.28); } 50% { box-shadow: 0 0 0 8px ${theme}33; } }
   .orb.listening { animation: avb-listen 1.2s ease-in-out infinite; }
   @keyframes avb-speak { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
