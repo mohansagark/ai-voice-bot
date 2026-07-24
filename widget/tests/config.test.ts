@@ -34,4 +34,21 @@ describe("validateConfig", () => {
     expect(cfg!.voice.ttsVoice).toBe("Arista-PlayAI");
     expect(cfg!.voice.enabled).toBe(true);
   });
+
+  it("themeColorSecondary defaults to the default themeColor when neither is provided", () => {
+    const cfg = validateConfig({ workerUrl: "https://w.test" });
+    expect(cfg!.branding.themeColorSecondary).toBe(DEFAULTS.branding.themeColor);
+  });
+
+  it("themeColorSecondary follows a custom themeColor when only themeColor is provided (stays a solid color)", () => {
+    const cfg = validateConfig({ workerUrl: "https://w.test", branding: { themeColor: "#ff0000" } } as any);
+    expect(cfg!.branding.themeColor).toBe("#ff0000");
+    expect(cfg!.branding.themeColorSecondary).toBe("#ff0000");
+  });
+
+  it("honors an explicit themeColorSecondary independent of themeColor", () => {
+    const cfg = validateConfig({ workerUrl: "https://w.test", branding: { themeColor: "#8750f7", themeColorSecondary: "#ff6fb0" } } as any);
+    expect(cfg!.branding.themeColor).toBe("#8750f7");
+    expect(cfg!.branding.themeColorSecondary).toBe("#ff6fb0");
+  });
 });

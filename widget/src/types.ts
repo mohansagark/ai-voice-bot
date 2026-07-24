@@ -1,6 +1,6 @@
 export interface WidgetConfig {
   workerUrl: string;
-  branding: { botName: string; themeColor: string; position: "bottom-right" | "bottom-left"; greeting: string };
+  branding: { botName: string; themeColor: string; themeColorSecondary: string; position: "bottom-right" | "bottom-left"; greeting: string };
   behavior: { autoGreet: boolean; rememberReturning: boolean; language: string };
   privacy: { consentText: string; privacyPolicyUrl: string | null };
   advanced: { analyticsCallback: ((event: string, payload?: unknown) => void) | null };
