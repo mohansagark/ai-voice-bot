@@ -157,24 +157,45 @@ onError: () => {
 },
 ```
 
-**`send()`'s `onDone`/`onError`/`onBlocked`** (the reply-handling callbacks) each clear `awaitingReply`
-and, if still in conversation mode, restart listening — **after** awaiting the speak() call so the
-restart happens only once Leo's voice has finished (E2):
+**Restart timing is driven by the speaker's existing `onState` callback, not by awaiting `speak()`.**
+`speaker.speak(text): Promise<void>` resolves when `audio.play()` resolves — which is when playback
+**starts**, not when it ends (confirmed in `widget/src/voice/tts.ts`); the actual "finished talking"
+signal is the `onState` callback transitioning to `"idle"` (fired from `audio.onended`). `index.ts`
+already has exactly one `onState` subscription (`speaker?.onState((s) => orb.setSpeaking(...))`) —
+this slice extends that same callback rather than adding a second one (the `Speaker` interface only
+holds a single callback), tracked via a new `awaitingSpeechEnd` flag:
 ```ts
-onDone: async (reply) => {
+speaker?.onState((s) => {
+  orb.setSpeaking(s === "speaking");
+  if (s === "idle" && awaitingSpeechEnd) {
+    awaitingSpeechEnd = false;
+    if (conversationMode) startListening();
+  }
+});
+```
+`send()`'s `onDone` sets `awaitingSpeechEnd` (when speech will actually play) or restarts listening
+immediately (when it won't):
+```ts
+onDone: (reply) => {
   panel.endBot(line, reply);
   orb.setThinking(false);
-  if (shouldSpeak(voiceInitiated, soundOn)) await speaker?.speak(reply);
   awaitingReply = false;
-  if (conversationMode) startListening();
+  if (shouldSpeak(voiceInitiated, soundOn) && speaker) {
+    awaitingSpeechEnd = true;
+    speaker.speak(reply); // fire-and-forget, as today — onState('idle') triggers the restart above
+  } else if (conversationMode) {
+    startListening();
+  }
 },
 onError: () => { line.remove(); panel.showError(); orb.setThinking(false); emit(analytics, "error"); awaitingReply = false; if (conversationMode) startListening(); },
 onBlocked: () => { line.remove(); orb.setThinking(false); emit(analytics, "blocked"); awaitingReply = false; if (conversationMode) startListening(); },
 ```
-(`send`'s signature/call sites are otherwise unchanged. `onDone` becoming `async` needs no interface
-change: `ChatEvents.onDone` is typed `(reply: string, leadSaved: boolean): void`, and `client.ts`'s
-`dispatch()` calls it fire-and-forget without awaiting — TypeScript already permits an async
-function there structurally, and nothing downstream needs the returned promise.)
+`send()` also resets `awaitingSpeechEnd = false` right before its existing `speaker?.stop()` call (at
+the top of `send()`), so a new message sent while a previous reply is still speaking can't trigger a
+stale restart — `stop()` itself fires `onState("idle")` (an existing v0.2c behavior, for clearing the
+orb's speaking animation on mute), which would otherwise be misread as "the reply we're waiting on
+just finished." `send`'s signature and every other call site are unchanged; `onDone` stays
+synchronous (no `async`/`await` needed anywhere in this flow).
 
 ---
 
@@ -205,7 +226,7 @@ function there structurally, and nothing downstream needs the returned promise.)
 |---|------|------------|
 | R1 | A second `getUserMedia` call could, on some browser/permission-model combination, prompt separately from `SpeechRecognition`'s own mic access | E7: fails silently, speech capture is unaffected either way; documented as an assumption to verify manually (§6), not a code-level guarantee. |
 | R2 | Holding a live `MediaStream`/`AudioContext` open across a long conversation could leak resources if `stop()` isn't reliably called on every exit path (tap-off, unmount, error) | `stopListening()` is the single choke point for both the recognizer and the visualizer's `stop()` — called from every exit path (tap-off, `onResult`, `onEnd`, `onError`), not duplicated per-callsite logic. |
-| R3 | `onDone` becoming `async` could change `sendChat`'s error-propagation behavior if a rejection inside `await speaker.speak()` were to bubble unexpectedly | `speaker.speak()` is already designed to never throw/reject (verified in v0.2c's spec/tests) — `await`ing it doesn't introduce a new unhandled-rejection path. |
+| R3 | A second `send()` firing while a previous reply is still speaking could misfire the restart (since `speaker.stop()` itself emits `onState("idle")`) | `awaitingSpeechEnd` is explicitly reset to `false` before `send()`'s existing `speaker?.stop()` call, so a stale flag from the previous turn can't trigger a spurious restart. |
 | R4 | Per-frame style updates (halo/bars/waveform, up to ~35 elements) at 60fps could be a performance concern on low-end devices | Only active while the mic is actually listening (a bounded, visitor-initiated window), not continuously; simple `height`/`opacity`/`transform` updates are cheap relative to layout-triggering properties. |
 
 ---
