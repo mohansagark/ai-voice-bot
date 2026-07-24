@@ -26,7 +26,7 @@ describe("validateConfig", () => {
   it("fills voice + language defaults", () => {
     const cfg = validateConfig({ workerUrl: "https://w.test" });
     expect(cfg!.behavior.language).toBe("en-US");
-    expect(cfg!.voice).toEqual({ enabled: true, ttsVoice: "troy", speakByDefault: false });
+    expect(cfg!.voice).toEqual({ enabled: true, ttsVoice: "hannah", speakByDefault: false });
   });
 
   it("merges partial voice config over defaults", () => {

@@ -6,11 +6,11 @@ describe("synthesizeSpeech", () => {
     const fake = (async (url: string, init?: RequestInit) => {
       expect(url).toBe("https://api.groq.com/openai/v1/audio/speech");
       const body = JSON.parse(String(init?.body));
-      expect(body).toEqual({ model: "canopylabs/orpheus-v1-english", voice: "troy", input: "hi", response_format: "wav" });
+      expect(body).toEqual({ model: "canopylabs/orpheus-v1-english", voice: "hannah", input: "hi", response_format: "wav" });
       expect((init?.headers as Record<string, string>).authorization).toBe("Bearer key");
       return new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { "content-type": "audio/wav" } });
     }) as unknown as typeof fetch;
-    const result = await synthesizeSpeech("hi", "troy", "key", fake);
+    const result = await synthesizeSpeech("hi", "hannah", "key", fake);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.contentType).toBe("audio/wav");

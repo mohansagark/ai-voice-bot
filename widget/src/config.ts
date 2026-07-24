@@ -5,7 +5,7 @@ export const DEFAULTS: Omit<WidgetConfig, "workerUrl"> = {
   behavior: { autoGreet: true, rememberReturning: true, language: "en-US" },
   privacy: { consentText: "I agree to share my info so I can be followed up with.", privacyPolicyUrl: null },
   advanced: { analyticsCallback: null },
-  voice: { enabled: true, ttsVoice: "troy", speakByDefault: false },
+  voice: { enabled: true, ttsVoice: "hannah", speakByDefault: false },
 };
 
 export function validateConfig(raw: unknown): WidgetConfig | null {

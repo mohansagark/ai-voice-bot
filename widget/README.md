@@ -154,7 +154,7 @@ window.AiVoiceBotConfig = {
 
   voice: {
     enabled: true,            // set false to disable mic + spoken replies entirely
-    ttsVoice: "troy",         // must match a voice your Worker's TTS_VOICE/backend supports
+    ttsVoice: "hannah",       // must match a voice your Worker's TTS_VOICE/backend supports
     speakByDefault: false,    // if true, Leo speaks replies to typed messages too, not just voice ones
   },
 

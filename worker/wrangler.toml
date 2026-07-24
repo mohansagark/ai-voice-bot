@@ -13,7 +13,7 @@ DEFAULT_PROVIDER = "groq"
 MAX_MESSAGE_CHARS = "2000"
 MAX_TURNS_PER_SESSION = "30"
 MODE = "prod"
-TTS_VOICE = "troy"
+TTS_VOICE = "hannah"
 MAX_TTS_CHARS = "1200"
 
 [[durable_objects.bindings]]

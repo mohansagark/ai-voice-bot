@@ -17,7 +17,7 @@ describe("shouldSpeak", () => {
 });
 
 describe("createSpeaker", () => {
-  const cfg = { workerUrl: "https://w.test", voice: "troy", lang: "en-US" };
+  const cfg = { workerUrl: "https://w.test", voice: "hannah", lang: "en-US" };
 
   it("plays the neural audio and reports speaking then idle", async () => {
     const audio = fakeAudio();
