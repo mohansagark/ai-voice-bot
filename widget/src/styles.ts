@@ -44,6 +44,16 @@ export function css(theme: string, theme2: string): string {
   .msg.bot { background: #241f30; align-self: flex-start; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
   .msg.user { background: linear-gradient(120deg, ${theme}, ${theme2}); color: #fff; align-self: flex-end; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
   .msg.note { align-self: center; background: transparent; color: #8a85a0; font-size: 12px; padding: 2px; }
+  .msg-text { display: block; }
+  .ts { display: block; margin-top: 4px; font-size: 11px; color: #756e8a; }
+  .msg.user .ts { text-align: right; color: rgba(255,255,255,.75); }
+  .typing { display: inline-flex; gap: 4px; padding: 2px 0; }
+  .typing span { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .5; animation: avb-bounce 1s infinite ease-in-out; }
+  .typing span:nth-child(2) { animation-delay: .15s; }
+  .typing span:nth-child(3) { animation-delay: .3s; }
+  @keyframes avb-bounce { 0%,60%,100% { transform: translateY(0); opacity:.5; } 30% { transform: translateY(-4px); opacity:1; } }
+  @keyframes avb-msg-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .msg-enter { animation: avb-msg-in .2s ease-out; }
   .consent { align-self: stretch; background: #f7f6fb; border: 1px solid #e2dff0; border-radius: 12px; padding: 12px; font-size: 13px; color: #4a4560; }
   .consent a { color: ${theme}; }
   .consent button { margin-top: 8px; background: ${theme}; color: #fff; border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
@@ -52,6 +62,6 @@ export function css(theme: string, theme2: string): string {
   input::placeholder { color: #756e8a; }
   input:focus-visible { outline: 2px solid ${theme}; outline-offset: 1px; }
   form button { background: linear-gradient(120deg, ${theme}, ${theme2}); color: #fff; border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
-  @media (prefers-reduced-motion: reduce) { .orb.idle { animation: none; } .orb.thinking::after { animation-duration: 1.6s; } .orb.listening, .orb.speaking { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .orb.idle { animation: none; } .orb.thinking::after { animation-duration: 1.6s; } .orb.listening, .orb.speaking { animation: none; } .msg-enter { animation: none; } .typing span { animation: none; } }
   `;
 }

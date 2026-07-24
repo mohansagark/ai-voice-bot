@@ -16,9 +16,9 @@ describe("wirePanel", () => {
     p.appendBot(bot, "there");
     p.endBot(bot);
     const msgs = refs.list.querySelectorAll(".msg");
-    expect(msgs[0].textContent).toBe("hello");
+    expect(msgs[0].querySelector(".msg-text")!.textContent).toBe("hello");
     expect(msgs[0].classList.contains("user")).toBe(true);
-    expect(msgs[1].textContent).toBe("Hi there");
+    expect(msgs[1].querySelector(".msg-text")!.textContent).toBe("Hi there");
     expect(msgs[1].classList.contains("bot")).toBe(true);
   });
 
@@ -61,6 +61,43 @@ describe("wirePanel", () => {
     const p = wirePanel(refs);
     p.startBotText("Hi");
     const bot = refs.list.querySelector(".msg.bot")!;
-    expect(bot.textContent).toBe("Hi");
+    expect(bot.querySelector(".msg-text")!.textContent).toBe("Hi");
+  });
+
+  it("shows a typing indicator on startBot() until the first token arrives", () => {
+    const refs = mountShell(cfg);
+    const p = wirePanel(refs);
+    const bot = p.startBot();
+    expect(bot.querySelector(".typing")).toBeTruthy();
+    p.appendBot(bot, "Hi");
+    expect(bot.querySelector(".typing")).toBeNull();
+    expect(bot.querySelector(".msg-text")!.textContent).toBe("Hi");
+  });
+
+  it("startBotText (greeting) never shows a typing indicator", () => {
+    const refs = mountShell(cfg);
+    const p = wirePanel(refs);
+    p.startBotText("Hello!");
+    const bot = refs.list.querySelector(".msg.bot")!;
+    expect(bot.querySelector(".typing")).toBeNull();
+  });
+
+  it("applies an entrance-animation class to new messages", () => {
+    const refs = mountShell(cfg);
+    const p = wirePanel(refs);
+    p.addUser("hi");
+    const msg = refs.list.querySelector(".msg.user")!;
+    expect(msg.classList.contains("msg-enter")).toBe(true);
+  });
+
+  it("renders a timestamp on user and bot messages, but not on notes", () => {
+    const refs = mountShell(cfg);
+    const p = wirePanel(refs);
+    p.addUser("hi");
+    p.note("✓ sent to Mohan");
+    const userMsg = refs.list.querySelector(".msg.user")!;
+    const noteMsg = refs.list.querySelector(".msg.note")!;
+    expect(userMsg.querySelector(".ts")).toBeTruthy();
+    expect(noteMsg.querySelector(".ts")).toBeNull();
   });
 });

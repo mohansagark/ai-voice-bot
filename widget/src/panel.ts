@@ -1,12 +1,29 @@
 import type { Refs } from "./dom";
 import type { WidgetConfig } from "./types";
 
+function formatTime(d: Date): string {
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 export function wirePanel(refs: Refs) {
   const scroll = () => { refs.list.scrollTop = refs.list.scrollHeight; };
   const line = (cls: string, text = ""): HTMLElement => {
     const d = document.createElement("div");
-    d.className = `msg ${cls}`;
-    d.textContent = text;
+    d.className = `msg ${cls} msg-enter`;
+    const body = document.createElement("span");
+    body.className = "msg-text";
+    if (cls === "bot" && !text) {
+      body.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>';
+    } else {
+      body.textContent = text;
+    }
+    d.appendChild(body);
+    if (cls === "user" || cls === "bot") {
+      const ts = document.createElement("span");
+      ts.className = "ts";
+      ts.textContent = formatTime(new Date());
+      d.appendChild(ts);
+    }
     refs.list.appendChild(d); scroll();
     return d;
   };
@@ -14,8 +31,17 @@ export function wirePanel(refs: Refs) {
     addUser: (text: string) => void line("user", text),
     startBot: (): HTMLElement => line("bot", ""),
     startBotText: (text: string) => void line("bot", text),
-    appendBot: (el: HTMLElement, text: string) => { el.textContent = (el.textContent ?? "") + text; scroll(); },
-    endBot: (el: HTMLElement, finalText?: string) => { if (finalText) el.textContent = finalText; else if (!el.textContent) el.textContent = "…"; scroll(); },
+    appendBot: (el: HTMLElement, text: string) => {
+      const body = el.querySelector(".msg-text")!;
+      body.textContent = (body.textContent ?? "") + text;
+      scroll();
+    },
+    endBot: (el: HTMLElement, finalText?: string) => {
+      const body = el.querySelector(".msg-text")!;
+      if (finalText) body.textContent = finalText;
+      else if (!body.textContent) body.textContent = "…";
+      scroll();
+    },
     note: (text: string) => void line("note", text),
     showError: () => void line("bot", "Hmm, something hiccuped — mind trying that again?"),
     onSubmit: (handler: (text: string) => void) => {
