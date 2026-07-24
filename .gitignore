@@ -10,3 +10,4 @@ leads.jsonl
 .dev.vars
 .wrangler/
 widget/dist/
+.superpowers/
