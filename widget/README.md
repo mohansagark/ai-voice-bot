@@ -134,6 +134,7 @@ window.AiVoiceBotConfig = {
   branding: {
     botName: "Leo",                                  // default: "Leo"
     themeColor: "#6C5CE7",                            // default: "#6C5CE7"
+    themeColorSecondary: "#6C5CE7",                   // default: same as themeColor (solid color) — set a second hex for a gradient
     position: "bottom-right",                         // "bottom-right" | "bottom-left"
     greeting: "Hi, I'm Leo — how can I help?",        // first-open message
   },
