@@ -36,4 +36,16 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toMatch(/read the room/i);
     expect(prompt).toContain(`Visitor: "nothing, stop" → You: "No worries — I'm here if you think of something."`);
   });
+  it("instructs switching to pronouns after the owner's name is established", () => {
+    expect(prompt).toMatch(/he\/him\/his/i);
+    expect(prompt).toMatch(/don't (repeat|say) his name in every/i);
+  });
+  it("instructs answering the actual question instead of reciting a fact as filler", () => {
+    expect(prompt).toMatch(/answer the actual question/i);
+    expect(prompt).toMatch(/not.*(as|the) (a )?non-sequitur|not as the answer/i);
+  });
+  it("scopes the 'above my pay grade' deflection to Mohan-specific unknowns, not general knowledge", () => {
+    expect(prompt).toMatch(/above my pay grade.*only for|only for.*specifically about/i);
+    expect(prompt).toMatch(/don't hedge or deflect/i);
+  });
 });
