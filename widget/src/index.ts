@@ -40,6 +40,7 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
     const refs = mountShell(cfg);
     const panel = wirePanel(refs);
     let greeted = false;
+    let spokenGreeting = false;
     let consentPending = false;
     let pendingVoice = false;
     let listening = false;
@@ -80,6 +81,15 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
         : isReturningVisitor ? "Welcome back! What can I help with?"
         : cfg.branding.greeting;
 
+    // The panel-open path and the proactive path can both want to speak the same greeting
+    // (e.g. the proactive trigger opens the panel for a first-time visitor, which itself fires
+    // the open-triggered greet-and-speak logic below) — this guard makes sure it's spoken once.
+    const speakGreetingOnce = (text: string) => {
+      if (spokenGreeting || !speaker) return;
+      spokenGreeting = true;
+      void speaker.speak(text);
+    };
+
     const orb = wireOrb(refs, (open) => {
       if (open) {
         emit(analytics, "open");
@@ -88,9 +98,7 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
           const text = greetingTextFor(name);
           panel.startBotText(text);
           greeted = true;
-          if (cfg.voice.enabled && speaker && shouldSpeak(false, soundOn)) {
-            void speaker.speak(text);
-          }
+          if (cfg.voice.enabled && shouldSpeak(false, soundOn)) speakGreetingOnce(text);
         }
       }
     });
@@ -103,7 +111,7 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
       setTimeout(() => {
         if (isFirstEverVisit && !knownName && !isReturningVisitor) orb.open({ focus: false });
         if (cfg.voice.enabled && speaker) {
-          speakGreetingOnInteraction(() => { void speaker!.speak(greetingTextFor(knownName)); }, {
+          speakGreetingOnInteraction(() => speakGreetingOnce(greetingTextFor(knownName)), {
             userActivation: deps.userActivation,
             addEventListener: deps.interactionAddEventListener,
           });

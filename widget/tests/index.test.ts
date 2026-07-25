@@ -346,6 +346,30 @@ describe("mount", () => {
     }
   });
 
+  it("first-time visitor with sound already on: speaks the greeting exactly once, not twice (proactive + manual-open paths must not both fire)", async () => {
+    vi.useFakeTimers();
+    try {
+      const cfg = { ...baseCfg, voice: { enabled: true, ttsVoice: "hannah", speakByDefault: true } };
+      let ttsCalls = 0;
+      const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
+      const fetchImpl = (async (url: string) => {
+        if (String(url).endsWith("/tts")) { ttsCalls++; return new Response("audio", { status: 200 }); }
+        throw new Error("chat should not be called by the proactive greeting");
+      }) as unknown as typeof fetch;
+      mount(cfg, {
+        store: memoryStore(),
+        fetchImpl,
+        makeAudio: () => audio,
+        userActivation: { hasBeenActive: true },
+      } as any)!;
+      await vi.advanceTimersByTimeAsync(1800);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(ttsCalls).toBe(1); // not 2 — the panel-opening path and the proactive path share one greeting event
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("returning visitor: does not auto-open (avb_visited already set), but still proactively speaks", async () => {
     vi.useFakeTimers();
     try {
