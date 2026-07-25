@@ -33,10 +33,16 @@ export function css(theme: string, theme2: string): string {
     position: fixed; bottom: 88px; width: 360px; max-width: calc(100vw - 32px);
     height: 520px; max-height: calc(100vh - 120px); z-index: 2147483000;
     background: #17151f; color: #eae7f2; border-radius: 16px; overflow: hidden;
-    box-shadow: 0 12px 48px rgba(0,0,0,.24); display: none; flex-direction: column;
+    box-shadow: 0 12px 48px rgba(0,0,0,.24); display: flex; flex-direction: column;
+    opacity: 0; transform: translateY(14px) scale(0.96); visibility: hidden; pointer-events: none;
+    transition: opacity .22s ease, transform .22s ease, visibility 0s linear .22s;
   }
-  .panel.pos-right { right: 20px; } .panel.pos-left { left: 20px; }
-  .panel[data-open="true"] { display: flex; }
+  .panel.pos-right { right: 20px; transform-origin: bottom right; }
+  .panel.pos-left { left: 20px; transform-origin: bottom left; }
+  .panel[data-open="true"] {
+    opacity: 1; transform: translateY(0) scale(1); visibility: visible; pointer-events: auto;
+    transition: opacity .22s ease, transform .22s ease, visibility 0s;
+  }
   .hd { background: linear-gradient(120deg, ${theme}, ${theme2}); padding: 14px 16px; }
   .hd-top { display: flex; align-items: center; justify-content: space-between; }
   .hd-identity { display: flex; align-items: center; gap: 8px; }
@@ -86,6 +92,6 @@ export function css(theme: string, theme2: string): string {
   input { width: 100%; padding: 10px 12px; border: 1px solid #332d42; background: #241f30; color: #eae7f2; border-radius: 10px; font-size: 14px; }
   input::placeholder { color: #756e8a; }
   input:focus-visible { outline: 2px solid ${theme}; outline-offset: 1px; }
-  @media (prefers-reduced-motion: reduce) { .orb.idle { animation: none; } .orb.thinking::after { animation-duration: 1.6s; } .orb.listening, .orb.speaking { animation: none; } .msg-enter { animation: none; } .typing span { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .orb.idle { animation: none; } .orb.thinking::after { animation-duration: 1.6s; } .orb.listening, .orb.speaking { animation: none; } .msg-enter { animation: none; } .typing span { animation: none; } .panel { transition: none; } }
   `;
 }
