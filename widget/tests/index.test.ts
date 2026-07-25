@@ -346,14 +346,49 @@ describe("mount", () => {
     }
   });
 
-  it("returning visitor: does not auto-open (avb_visited already set)", async () => {
+  it("returning visitor: does not auto-open (avb_visited already set), but still proactively speaks", async () => {
     vi.useFakeTimers();
     try {
       const store = memoryStore();
       store.set("avb_visited", "1");
-      const app = mount(baseCfg, { store, fetchImpl: fetch } as any)!;
+      const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
+      const fetchImpl = (async (url: string) => {
+        if (String(url).endsWith("/tts")) return new Response("audio", { status: 200 });
+        throw new Error("chat should not be called by the proactive greeting");
+      }) as unknown as typeof fetch;
+      const app = mount(baseCfg, { store, fetchImpl, makeAudio: () => audio, userActivation: { hasBeenActive: true } } as any)!;
       await vi.advanceTimersByTimeAsync(5000); // well past the 1800ms delay
-      expect(app.refs.panel.getAttribute("data-open")).toBe("false");
+      expect(app.refs.panel.getAttribute("data-open")).toBe("false"); // panel-open is still a one-time-ever thing
+      expect(audio.played).toBe(true); // but the voice greeting plays on this visit too
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("speaks a greeting on every visit, not just the first-ever one (mounting twice against the same persisted store)", async () => {
+    vi.useFakeTimers();
+    try {
+      const store = memoryStore();
+      const speakCalls: string[] = [];
+      const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
+      const fetchImpl = (async (url: string, init?: RequestInit) => {
+        if (String(url).endsWith("/tts")) { speakCalls.push(String(init?.body)); return new Response("audio", { status: 200 }); }
+        throw new Error("chat should not be called by the proactive greeting");
+      }) as unknown as typeof fetch;
+
+      // First visit: fresh store — panel opens, generic greeting spoken.
+      const app1 = mount(baseCfg, { store, fetchImpl, makeAudio: () => audio, userActivation: { hasBeenActive: true } } as any)!;
+      await vi.advanceTimersByTimeAsync(1800);
+      expect(app1.refs.panel.getAttribute("data-open")).toBe("true");
+      expect(speakCalls.length).toBe(1);
+      expect(speakCalls[0]).toContain("Hi there!");
+
+      // Second visit against the same store (avb_visited now set): panel stays closed, but it speaks again.
+      const app2 = mount(baseCfg, { store, fetchImpl, makeAudio: () => audio, userActivation: { hasBeenActive: true } } as any)!;
+      await vi.advanceTimersByTimeAsync(1800);
+      expect(app2.refs.panel.getAttribute("data-open")).toBe("false");
+      expect(speakCalls.length).toBe(2);
+      expect(speakCalls[1]).toContain("Hi there!");
     } finally {
       vi.useRealTimers();
     }

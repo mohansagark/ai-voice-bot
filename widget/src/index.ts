@@ -94,11 +94,14 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
         }
       }
     });
-    if (cfg.behavior.autoGreet && cfg.behavior.proactiveGreet && !session.hasVisitedBefore()) {
+    if (cfg.behavior.autoGreet && cfg.behavior.proactiveGreet) {
+      // The panel auto-opens at most once, ever, on a visitor's true first encounter with the
+      // site — but the proactive spoken greeting happens on every visit, first or returning.
+      const isFirstEverVisit = !session.hasVisitedBefore();
       session.markVisited();
       const knownName = cfg.behavior.rememberReturning ? session.name() : null;
       setTimeout(() => {
-        if (!knownName && !isReturningVisitor) orb.open({ focus: false });
+        if (isFirstEverVisit && !knownName && !isReturningVisitor) orb.open({ focus: false });
         if (cfg.voice.enabled && speaker) {
           speakGreetingOnInteraction(() => { void speaker!.speak(greetingTextFor(knownName)); }, {
             userActivation: deps.userActivation,
