@@ -76,7 +76,7 @@ export function createApp(
         try { state = await handle.load(); }
         catch (e) { return Response.json({ error: String((e as Error).message) }, { status: 500, headers: cors }); }
 
-        const BLOCK_MSG = "Looks like we're going in circles — I'm going to pause here. If you've got a real question, please reach out to Mohan directly.";
+        const BLOCK_MSG = `Looks like we're going in circles — I'm going to pause here. If you've got a real question, please reach out to ${config.persona.owner.name} directly.`;
         // Already blocked earlier this session → go silent (no message, no LLM). Cheapest possible.
         if (enforce && state.blocked) return Response.json({ blocked: true }, { status: 429, headers: cors });
         // Fresh spam trip: deliver the pause line ONCE, then the session is silent from here on.

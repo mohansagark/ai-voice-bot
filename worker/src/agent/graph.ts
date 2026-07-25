@@ -1,7 +1,7 @@
 import { StateGraph, START, END } from "@langchain/langgraph";
 import { ChatState } from "./state";
 import {
-  guardrailNode, routeAfterGuardrail, refuseNode,
+  guardrailNode, routeAfterGuardrail, makeRefuseNode,
   makeAgentNode, routeAfterAgent,
   makeSaveLeadNode, routeAfterSaveLead, makeConfirmNode,
   type AgentDeps,
@@ -10,7 +10,7 @@ import {
 export function buildGraph(deps: AgentDeps) {
   return new StateGraph(ChatState)
     .addNode("guardrail", guardrailNode)
-    .addNode("refuse", refuseNode)
+    .addNode("refuse", makeRefuseNode(deps))
     .addNode("agent", makeAgentNode(deps))
     .addNode("save_lead", makeSaveLeadNode(deps))
     .addNode("confirm", makeConfirmNode(deps))

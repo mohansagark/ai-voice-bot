@@ -159,7 +159,7 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
           onLead: (lead) => {
             const nm = (lead as { name?: string })?.name;
             if (nm && typeof nm === "string" && cfg.behavior.rememberReturning) session.setName(nm.split(" ")[0]);
-            panel.note("✓ sent to Mohan");
+            panel.note("✓ sent");
             emit(analytics, "lead", lead);
           },
           onDone: (reply) => {

@@ -84,6 +84,7 @@ describe("mount", () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(store.get("avb_name")).toBe("Alex");
     expect(app.refs.list.textContent).toContain("✓ sent");
+    expect(app.refs.list.textContent).not.toContain("Mohan"); // widget ships generic — no hardcoded owner name
   });
 
   it("disables the mic when SpeechRecognition is unsupported (default test env)", () => {

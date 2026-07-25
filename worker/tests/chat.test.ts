@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { AIMessage, HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import { createApp, type SessionHandle } from "../src/index";
-import type { Env } from "../src/config";
+import { defaultPersona, type Env } from "../src/config";
 import type { SessionState } from "../src/session-store";
 import type { GraphRunner, GraphFinal } from "../src/stream";
 
@@ -127,6 +127,8 @@ describe("/chat (SSE + session memory)", () => {
     const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
     const body = await readSSE(await app.fetch(chatReq({ session_id: "s1", message: "buy now" }), env));
     expect(body).toContain("going in circles");           // the pause message was delivered
+    expect(body).toContain(defaultPersona.owner.name);      // owner name comes from persona config, not hardcoded
+    expect(body).not.toContain("Mohan");                    // this test's env has no PERSONA_JSON — must not leak the real name
     expect(seen.length).toBe(0);                            // the model runner was NEVER called (no tokens)
     expect(map.get("s1")?.blocked).toBe(true);             // session is now sticky-blocked
   });

@@ -31,12 +31,12 @@ export function routeAfterGuardrail(state: ChatStateType): "refuse" | "agent" {
   return state.offTopicStrikes > 0 ? "refuse" : "agent";
 }
 
-export function refuseNode(): Partial<ChatStateType> {
-  return {
+export function makeRefuseNode(deps: AgentDeps) {
+  return (): Partial<ChatStateType> => ({
     messages: [new AIMessage(
-      "Ha — nice try! But I'm just here to chat about Mohan and pass a note along for you. So… what's actually on your mind?",
+      `Ha — nice try! But I'm just here to chat about ${deps.persona.owner.name} and pass a note along for you. So… what's actually on your mind?`,
     )],
-  };
+  });
 }
 
 export function makeAgentNode(deps: AgentDeps) {
