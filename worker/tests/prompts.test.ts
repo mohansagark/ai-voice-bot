@@ -48,4 +48,7 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toMatch(/above my pay grade.*only for|only for.*specifically about/i);
     expect(prompt).toMatch(/don't hedge or deflect/i);
   });
+  it("does not hardcode a specific personality example into the generic instruction text", () => {
+    expect(prompt).not.toMatch(/sharp, hands-on problem-solver who genuinely loves the hard stuff/i);
+  });
 });
