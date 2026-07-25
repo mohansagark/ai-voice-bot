@@ -32,21 +32,35 @@ export interface Env {
   MODE?: string;
   TTS_VOICE?: string;
   MAX_TTS_CHARS?: string;
+  PERSONA_JSON?: string;
   SESSION_DO: DurableObjectNamespace;
 }
 
 export const defaultPersona: Persona = {
   botName: "Leo",
-  owner: { name: "Mohan", role: "Software Engineer" },
-  bio: "Senior software engineer specializing in AI and frontend.",
-  tone: "playful, warm, and a little cheeky — a witty friend hyping Mohan up, never a corporate bio",
+  owner: { name: "Alex", role: "Software Engineer" },
+  bio: "A software engineer who enjoys building things and solving interesting problems.",
+  tone: "warm, a little playful, and genuinely curious — a friendly guide, never a corporate bio",
   facts: [
-    "Mohan is a sharp, hands-on problem-solver who genuinely lights up when something is broken and needs fixing.",
-    "He works across AI and full-stack development, with deep ServiceNow experience.",
-    "He is open to freelance projects and full-time roles — and loves a meaty technical challenge.",
+    "Alex works across full-stack development and enjoys tackling hard technical problems.",
+    "Alex is open to freelance projects and full-time roles.",
   ],
   do_not: ["quote prices", "commit to dates", "schedule meetings"],
 };
+
+export function loadPersona(env: Env): Persona {
+  if (!env.PERSONA_JSON) return defaultPersona;
+  try {
+    const parsed = JSON.parse(env.PERSONA_JSON) as Partial<Persona>;
+    return {
+      ...defaultPersona,
+      ...parsed,
+      owner: { ...defaultPersona.owner, ...(parsed.owner ?? {}) },
+    };
+  } catch {
+    return defaultPersona;
+  }
+}
 
 export const providers: Record<string, ProviderConfig> = {
   groq: {
@@ -62,7 +76,7 @@ export function loadConfig(env: Env): AppConfig {
   return {
     defaultProvider: env.DEFAULT_PROVIDER || "groq",
     providers,
-    persona: defaultPersona,
+    persona: loadPersona(env),
     allowedOrigins: (env.ALLOWED_ORIGINS || "")
       .split(",").map((s) => s.trim()).filter(Boolean),
     maxMessageChars: Number(env.MAX_MESSAGE_CHARS || "2000"),
