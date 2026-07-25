@@ -45,6 +45,34 @@ describe("mount", () => {
     expect(app.refs.list.textContent).toContain("Welcome back, Alex");
   });
 
+  it("speaks the greeting on a manual orb click when sound is on", async () => {
+    const cfg = { ...baseCfg, voice: { enabled: true, ttsVoice: "hannah", speakByDefault: true } };
+    const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
+    const fetchImpl = (async (url: string) => {
+      if (String(url).endsWith("/tts")) return new Response("audio", { status: 200 });
+      throw new Error("chat should not be called just from opening the panel");
+    }) as unknown as typeof fetch;
+    const app = mount(cfg, { store: memoryStore(), fetchImpl, makeAudio: () => audio })!;
+    app.refs.orb.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(app.refs.list.textContent).toContain("Hi there!");
+    expect(audio.played).toBe(true);
+  });
+
+  it("does not speak the greeting on a manual orb click when sound is off (muted)", async () => {
+    const cfg = { ...baseCfg, voice: { enabled: true, ttsVoice: "hannah", speakByDefault: false } };
+    const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
+    const fetchImpl = (async (url: string) => {
+      if (String(url).endsWith("/tts")) return new Response("audio", { status: 200 });
+      throw new Error("chat should not be called just from opening the panel");
+    }) as unknown as typeof fetch;
+    const app = mount(cfg, { store: memoryStore(), fetchImpl, makeAudio: () => audio })!;
+    app.refs.orb.click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(app.refs.list.textContent).toContain("Hi there!");
+    expect(audio.played).toBe(false);
+  });
+
   it("stores the visitor's first name and shows a note on a lead event", async () => {
     const store = memoryStore();
     const fetchImpl = (async () => streamRes([sse("lead", { lead: { name: "Alex Rivera" } }), sse("done", { reply: "Thanks!", lead_saved: true })])) as unknown as typeof fetch;

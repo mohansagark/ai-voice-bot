@@ -85,8 +85,12 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
         emit(analytics, "open");
         if (!greeted && cfg.behavior.autoGreet) {
           const name = cfg.behavior.rememberReturning ? session.name() : null;
-          panel.startBotText(greetingTextFor(name));
+          const text = greetingTextFor(name);
+          panel.startBotText(text);
           greeted = true;
+          if (cfg.voice.enabled && speaker && shouldSpeak(false, soundOn)) {
+            void speaker.speak(text);
+          }
         }
       }
     });
