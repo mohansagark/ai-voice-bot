@@ -29,4 +29,11 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toMatch(/never say or imply you are an AI|language model/i);
     expect(prompt).toMatch(/save_lead only ONCE|already taken their details/i);
   });
+  it("never asks the same or a similarly-worded question twice in one conversation", () => {
+    expect(prompt).toMatch(/never ask the same.*question twice|similarly-worded question twice/i);
+  });
+  it("reads the room and backs off on a short/disinterested reply, with a matching example", () => {
+    expect(prompt).toMatch(/read the room/i);
+    expect(prompt).toContain(`Visitor: "nothing, stop" → You: "No worries — I'm here if you think of something."`);
+  });
 });
