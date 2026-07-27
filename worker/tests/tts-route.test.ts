@@ -72,4 +72,23 @@ describe("/tts", () => {
     const withoutKey = await app.fetch(new Request("https://w/health"), noKeyEnv);
     expect((await withoutKey.json() as any).tts).toBe("browser");
   });
+
+  it("/health reports deepgram when only DEEPGRAM_API_KEY is set", async () => {
+    const app = createApp({ ...stubDeps, fetchImpl: fetch });
+    const deepgramEnv = { ...env, GROQ_API_KEY: undefined, DEEPGRAM_API_KEY: "dg-x" } as unknown as Env;
+    const res = await app.fetch(new Request("https://w/health"), deepgramEnv);
+    expect((await res.json() as any).tts).toBe("deepgram");
+  });
+
+  it("falls back to Deepgram when Groq fails and DEEPGRAM_API_KEY is configured", async () => {
+    const fetchImpl = (async (url: string) => {
+      if (String(url).includes("groq")) return new Response("rate limited", { status: 429 });
+      return new Response(new Uint8Array([9]), { status: 200, headers: { "content-type": "audio/mpeg" } });
+    }) as unknown as typeof fetch;
+    const deepgramEnv = { ...env, DEEPGRAM_API_KEY: "dg-x" } as unknown as Env;
+    const app = createApp({ ...stubDeps, fetchImpl });
+    const res = await app.fetch(ttsReq({ text: "hi" }), deepgramEnv);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("audio/mpeg");
+  });
 });

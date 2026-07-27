@@ -79,7 +79,7 @@ export function createApp(
       if (url.pathname === "/health") {
         const p = config.providers[config.defaultProvider];
         return Response.json(
-          { ok: true, provider: config.defaultProvider, model: p?.model, tts: env.GROQ_API_KEY ? "groq" : "browser", leads: env.DB ? "d1" : "none", mode: config.mode },
+          { ok: true, provider: config.defaultProvider, model: p?.model, tts: env.GROQ_API_KEY ? "groq" : env.DEEPGRAM_API_KEY ? "deepgram" : "browser", leads: env.DB ? "d1" : "none", mode: config.mode },
           { headers: cors },
         );
       }
@@ -192,11 +192,11 @@ export function createApp(
         if (enforce && body.text.length > config.maxTtsChars) {
           return Response.json({ error: "text too long" }, { status: 413, headers: cors });
         }
-        if (!env.GROQ_API_KEY) {
+        if (!env.GROQ_API_KEY && !env.DEEPGRAM_API_KEY) {
           return Response.json({ error: "tts not configured" }, { status: 502, headers: cors });
         }
         const voice = body.voice || config.ttsVoice;
-        const result = await synthesizeSpeech(body.text, voice, env.GROQ_API_KEY, deps.fetchImpl ?? fetch);
+        const result = await synthesizeSpeech(body.text, voice, env.GROQ_API_KEY, env.DEEPGRAM_API_KEY, deps.fetchImpl ?? fetch);
         if (!result.ok) return Response.json({ error: result.error }, { status: result.status, headers: cors });
         return new Response(result.body, { status: 200, headers: { ...cors, "content-type": result.contentType } });
       }

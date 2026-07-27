@@ -24,6 +24,8 @@ export interface AppConfig {
 export interface Env {
   GROQ_API_KEY?: string;
   GEMINI_API_KEY?: string;
+  // Fallback TTS provider — used only when Groq's TTS call fails (rate limit, outage, etc.).
+  DEEPGRAM_API_KEY?: string;
   ALLOWED_ORIGINS?: string;
   DEFAULT_PROVIDER?: string;
   MAX_MESSAGE_CHARS?: string;
