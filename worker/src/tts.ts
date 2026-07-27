@@ -14,7 +14,10 @@ export async function synthesizeSpeech(
       headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ model: "canopylabs/orpheus-v1-english", voice, input: text, response_format: "wav" }),
     });
-    if (!res.ok) return { ok: false, status: 502, error: `groq tts error ${res.status}` };
+    // Forward Groq's real status (esp. 429 rate-limit) instead of collapsing every
+    // upstream failure into a generic 502 — the caller needs to tell "rate limited,
+    // back off" apart from "actually broken."
+    if (!res.ok) return { ok: false, status: res.status, error: `groq tts error ${res.status}` };
     const body = await res.arrayBuffer();
     return { ok: true, body, contentType: res.headers.get("content-type") || "audio/wav" };
   } catch (e) {

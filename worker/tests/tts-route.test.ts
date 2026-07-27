@@ -42,11 +42,18 @@ describe("/tts", () => {
     expect(res.status).toBe(413);
   });
 
-  it("returns 502 when Groq fails", async () => {
+  it("forwards Groq's failure status", async () => {
     const fetchImpl = (async () => new Response("bad", { status: 500 })) as unknown as typeof fetch;
     const app = createApp({ ...stubDeps, fetchImpl });
     const res = await app.fetch(ttsReq({ text: "hi" }), env);
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(500);
+  });
+
+  it("forwards a 429 rate-limit distinctly from other failures", async () => {
+    const fetchImpl = (async () => new Response("rate limited", { status: 429 })) as unknown as typeof fetch;
+    const app = createApp({ ...stubDeps, fetchImpl });
+    const res = await app.fetch(ttsReq({ text: "hi" }), env);
+    expect(res.status).toBe(429);
   });
 
   it("bypasses origin + length guards in dev mode", async () => {

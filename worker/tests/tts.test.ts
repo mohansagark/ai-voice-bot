@@ -18,10 +18,16 @@ describe("synthesizeSpeech", () => {
     }
   });
 
-  it("returns a 502 failure when Groq responds non-OK", async () => {
+  it("forwards Groq's real status when it responds non-OK", async () => {
     const fake = (async () => new Response("bad", { status: 500 })) as unknown as typeof fetch;
     const result = await synthesizeSpeech("hi", "v", "key", fake);
-    expect(result).toEqual({ ok: false, status: 502, error: "groq tts error 500" });
+    expect(result).toEqual({ ok: false, status: 500, error: "groq tts error 500" });
+  });
+
+  it("forwards a 429 rate-limit status distinctly (callers back off on this one)", async () => {
+    const fake = (async () => new Response("rate limited", { status: 429 })) as unknown as typeof fetch;
+    const result = await synthesizeSpeech("hi", "v", "key", fake);
+    expect(result).toEqual({ ok: false, status: 429, error: "groq tts error 429" });
   });
 
   it("returns a 502 failure on a network error", async () => {
