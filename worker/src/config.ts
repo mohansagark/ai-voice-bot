@@ -26,6 +26,8 @@ export interface Env {
   GEMINI_API_KEY?: string;
   // Fallback TTS provider — used only when Groq's TTS call fails (rate limit, outage, etc.).
   DEEPGRAM_API_KEY?: string;
+  // Fallback chat provider — used only when Groq's chat call fails (rate limit, outage, etc.).
+  OPENROUTER_API_KEY?: string;
   ALLOWED_ORIGINS?: string;
   DEFAULT_PROVIDER?: string;
   MAX_MESSAGE_CHARS?: string;
@@ -84,6 +86,12 @@ export const providers: Record<string, ProviderConfig> = {
   },
   // Google's OpenAI-compatible endpoint, so buildModel's ChatOpenAI client can target Gemini.
   gemini: { model: "gemini-2.0-flash", baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/", keyEnv: "GEMINI_API_KEY" },
+  // Cross-vendor fallback for /chat — a free OpenRouter model, used only when Groq fails.
+  openrouter: {
+    model: "nvidia/nemotron-3-super-120b-a12b:free",
+    baseURL: "https://openrouter.ai/api/v1",
+    keyEnv: "OPENROUTER_API_KEY",
+  },
 };
 
 export function loadConfig(env: Env): AppConfig {

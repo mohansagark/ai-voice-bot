@@ -120,6 +120,13 @@ export function createApp(
         try { model = deps.buildModel(config, env); }
         catch (e) { return Response.json({ error: String((e as Error).message) }, { status: 500, headers: cors }); }
 
+        // Cross-vendor fallback for a Groq outage/rate-limit — best-effort only, chat still
+        // works (just without a fallback) if OPENROUTER_API_KEY isn't set or fails to build.
+        let fallbackModel: ReturnType<typeof deps.buildModel> | undefined;
+        if (env.OPENROUTER_API_KEY) {
+          try { fallbackModel = deps.buildModel(config, env, "openrouter"); } catch { /* no fallback available */ }
+        }
+
         const persistLeadFn = deps.persistLead ?? (async (row: LeadRow) => {
           try { await persistLeadToD1(env as any, row); }
           catch (e) { console.error("saveLead (D1) failed:", String((e as Error).message)); throw e; }
@@ -129,7 +136,7 @@ export function createApp(
         let portfolioContext = "";
         try { portfolioContext = await (deps.getPortfolioContext ?? getPortfolioContext)(env); }
         catch (e) { console.error("getPortfolioContext failed (continuing without it):", String((e as Error).message)); }
-        const graph = buildGraph({ model, persona: config.persona, portfolioContext, persistLead: persistLeadFn });
+        const graph = buildGraph({ model, fallbackModel, persona: config.persona, portfolioContext, persistLead: persistLeadFn });
         const history = deserializeMessages(state.messages);
         const messages = [...history, new HumanMessage(body.message)];
         const run = deps.makeRunner(graph)(

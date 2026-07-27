@@ -155,5 +155,23 @@ describe("graph", () => {
       vi.useRealTimers();
     }
   });
+
+  it("falls back to the fallback model when the primary model call fails", async () => {
+    const failingModel: ChatModelLike = {
+      bindTools: () => ({ invoke: () => Promise.reject(new Error("429 rate limited")) }),
+    };
+    const { deps: d, model: fallbackModel } = deps([new AIMessage("Hi from the fallback!")]);
+    const g = buildGraph({ ...d, model: failingModel, fallbackModel });
+    const out = await g.invoke({ messages: [new HumanMessage("hello")] });
+    expect(String(out.messages.at(-1)?.content)).toBe("Hi from the fallback!");
+  });
+
+  it("propagates the primary's error when no fallback model is configured", async () => {
+    const failingModel: ChatModelLike = {
+      bindTools: () => ({ invoke: () => Promise.reject(new Error("429 rate limited")) }),
+    };
+    const g = buildGraph({ model: failingModel, persona: defaultPersona, persistLead: async () => {} });
+    await expect(g.invoke({ messages: [new HumanMessage("hello")] })).rejects.toThrow(/429 rate limited/);
+  });
 });
 

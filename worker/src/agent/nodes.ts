@@ -9,6 +9,8 @@ import type { Persona } from "../config";
 
 export interface AgentDeps {
   model: ChatModelLike;
+  // Cross-vendor fallback — invoked only when the primary model call fails or times out.
+  fallbackModel?: ChatModelLike;
   persona: Persona;
   portfolioContext?: string;
   persistLead: (row: LeadRow) => Promise<void>;
@@ -61,18 +63,22 @@ export function makeRefuseNode(deps: AgentDeps) {
 export function makeAgentNode(deps: AgentDeps) {
   const system = new SystemMessage(buildSystemPrompt(deps.persona, deps.portfolioContext));
   const bound = deps.model.bindTools([saveLeadTool]);
+  const fallbackBound = deps.fallbackModel?.bindTools([saveLeadTool]);
   return async (state: ChatStateType): Promise<Partial<ChatStateType>> => {
     const extra = state.leadSaved
       ? [new SystemMessage(
           "IMPORTANT: You have already recorded this visitor's contact details this session. Do NOT ask for their name/email again and do NOT call save_lead again — just chat naturally and help with whatever they say next.",
         )]
       : [];
-    const reply = await withTimeout(
-      bound.invoke([system, ...extra, ...state.messages]),
-      AGENT_INVOKE_TIMEOUT_MS,
-      "LLM invoke",
-    );
-    return { messages: [reply] };
+    const messages = [system, ...extra, ...state.messages];
+    try {
+      const reply = await withTimeout(bound.invoke(messages), AGENT_INVOKE_TIMEOUT_MS, "LLM invoke");
+      return { messages: [reply] };
+    } catch (e) {
+      if (!fallbackBound) throw e;
+      const reply = await withTimeout(fallbackBound.invoke(messages), AGENT_INVOKE_TIMEOUT_MS, "LLM invoke (fallback)");
+      return { messages: [reply] };
+    }
   };
 }
 

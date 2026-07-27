@@ -194,4 +194,33 @@ describe("/chat dev mode (guards bypassed)", () => {
     expect(res.status).toBe(200); // KV failure is non-fatal, same pattern as RAG's old graceful degradation
     expect(called).toBe(true);
   });
+
+  it("builds an OpenRouter fallback model when OPENROUTER_API_KEY is set", async () => {
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["hi"], { reply: "hi", leadSaved: false, lead: {} });
+    const providersSeen: (string | undefined)[] = [];
+    const buildModel = ((_config: unknown, _env: unknown, provider?: string) => {
+      providersSeen.push(provider);
+      return { bindTools: () => ({ invoke: async () => new AIMessage("") }) };
+    }) as any;
+    const envWithFallback = { ...env, OPENROUTER_API_KEY: "or-x" } as unknown as Env;
+    const app = createApp({ buildModel, getSession, makeRunner });
+    const res = await app.fetch(chatReq({ session_id: "s1", message: "hello" }), envWithFallback);
+    expect(res.status).toBe(200);
+    expect(providersSeen).toContain("openrouter");
+  });
+
+  it("does not attempt an OpenRouter fallback build when OPENROUTER_API_KEY is unset", async () => {
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["hi"], { reply: "hi", leadSaved: false, lead: {} });
+    const providersSeen: (string | undefined)[] = [];
+    const buildModel = ((_config: unknown, _env: unknown, provider?: string) => {
+      providersSeen.push(provider);
+      return { bindTools: () => ({ invoke: async () => new AIMessage("") }) };
+    }) as any;
+    const app = createApp({ buildModel, getSession, makeRunner });
+    const res = await app.fetch(chatReq({ session_id: "s1", message: "hello" }), env);
+    expect(res.status).toBe(200);
+    expect(providersSeen).not.toContain("openrouter");
+  });
 });
