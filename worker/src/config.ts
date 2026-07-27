@@ -46,9 +46,6 @@ export interface Env {
   // key "context". A KV namespace (not a secret/var) because secrets cap at 5.1KB and this
   // repo is shared/forkable — nobody's actual portfolio content belongs committed here.
   PORTFOLIO_KV?: { get(key: string): Promise<string | null> };
-  // Google Cloud Text-to-Speech API key. Deliberately NOT Workers AI/neurons — those are
-  // a shared account-wide daily budget already spent on other projects (image generation).
-  GOOGLE_TTS_API_KEY?: string;
 }
 
 export const defaultPersona: Persona = {
@@ -97,7 +94,7 @@ export function loadConfig(env: Env): AppConfig {
     maxMessageChars: Number(env.MAX_MESSAGE_CHARS || "2000"),
     maxTurnsPerSession: Number(env.MAX_TURNS_PER_SESSION || "30"),
     mode: env.MODE === "dev" ? "dev" : "prod",
-    ttsVoice: env.TTS_VOICE || "en-US-Wavenet-F",
+    ttsVoice: env.TTS_VOICE || "hannah",
     maxTtsChars: Number(env.MAX_TTS_CHARS || "1200"),
   };
 }
