@@ -4,6 +4,7 @@ import {
   guardrailNode, routeAfterGuardrail, makeRefuseNode,
   makeAgentNode, routeAfterAgent,
   makeSaveLeadNode, routeAfterSaveLead, makeConfirmNode,
+  makeShowTimePickerNode,
   type AgentDeps,
 } from "./nodes";
 
@@ -14,11 +15,13 @@ export function buildGraph(deps: AgentDeps) {
     .addNode("agent", makeAgentNode(deps))
     .addNode("save_lead", makeSaveLeadNode(deps))
     .addNode("confirm", makeConfirmNode(deps))
+    .addNode("show_time_picker", makeShowTimePickerNode(deps))
     .addEdge(START, "guardrail")
     .addConditionalEdges("guardrail", routeAfterGuardrail, { refuse: "refuse", agent: "agent" })
     .addEdge("refuse", END)
-    .addConditionalEdges("agent", routeAfterAgent, { save_lead: "save_lead", end: END })
+    .addConditionalEdges("agent", routeAfterAgent, { save_lead: "save_lead", show_time_picker: "show_time_picker", end: END })
     .addConditionalEdges("save_lead", routeAfterSaveLead, { confirm: "confirm", agent: "agent" })
     .addEdge("confirm", END)
+    .addEdge("show_time_picker", "agent")
     .compile();
 }

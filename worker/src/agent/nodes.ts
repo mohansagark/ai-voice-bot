@@ -1,7 +1,7 @@
 import { AIMessage, SystemMessage, ToolMessage } from "@langchain/core/messages";
 import type { ChatStateType } from "./state";
 import type { ChatModelLike } from "../providers";
-import { saveLeadTool, saveLeadSchema } from "./tools";
+import { saveLeadTool, saveLeadSchema, showTimePickerTool } from "./tools";
 import { buildSystemPrompt } from "../prompts";
 import { isValidEmail } from "../leads";
 import type { LeadRow } from "../leads-store";
@@ -62,8 +62,8 @@ export function makeRefuseNode(deps: AgentDeps) {
 
 export function makeAgentNode(deps: AgentDeps) {
   const system = new SystemMessage(buildSystemPrompt(deps.persona, deps.portfolioContext));
-  const bound = deps.model.bindTools([saveLeadTool]);
-  const fallbackBound = deps.fallbackModel?.bindTools([saveLeadTool]);
+  const bound = deps.model.bindTools([saveLeadTool, showTimePickerTool]);
+  const fallbackBound = deps.fallbackModel?.bindTools([saveLeadTool, showTimePickerTool]);
   return async (state: ChatStateType): Promise<Partial<ChatStateType>> => {
     const extra = state.leadSaved
       ? [new SystemMessage(
@@ -83,10 +83,27 @@ export function makeAgentNode(deps: AgentDeps) {
   };
 }
 
-export function routeAfterAgent(state: ChatStateType): "save_lead" | "end" {
+export function routeAfterAgent(state: ChatStateType): "save_lead" | "show_time_picker" | "end" {
   const last = state.messages[state.messages.length - 1] as AIMessage;
   const calls = last.tool_calls ?? [];
-  return calls.some((c) => c.name === "save_lead") ? "save_lead" : "end";
+  if (calls.some((c) => c.name === "save_lead")) return "save_lead";
+  if (calls.some((c) => c.name === "show_time_picker")) return "show_time_picker";
+  return "end";
+}
+
+export function makeShowTimePickerNode(deps: AgentDeps) {
+  return (state: ChatStateType): Partial<ChatStateType> => {
+    const last = state.messages[state.messages.length - 1] as AIMessage;
+    const call = (last.tool_calls ?? []).find((c) => c.name === "show_time_picker");
+    if (!call) return {};
+    return {
+      uiComponent: "time_picker",
+      messages: [new ToolMessage({
+        tool_call_id: call.id!,
+        content: "The time picker is now showing in the chat UI for the visitor to fill in. Don't ask for a time in text or repeat the question — just acknowledge briefly and wait for their selection.",
+      })],
+    };
+  };
 }
 
 export function makeSaveLeadNode(deps: AgentDeps) {

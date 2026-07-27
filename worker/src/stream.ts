@@ -11,6 +11,7 @@ export interface GraphFinal {
   leadSaved: boolean;
   lead: Lead;
   messages: BaseMessage[];
+  uiComponent: string | null;
 }
 export interface GraphStreamRun {
   tokens: AsyncIterable<string>;
@@ -41,6 +42,7 @@ export function streamChatSSE(
           try { await persist(f); } catch { /* memory of this turn lost; reply still delivered */ }
         }
         if (f.leadSaved) send("lead", { saved: true, lead: f.lead });
+        if (f.uiComponent) send("component", { type: f.uiComponent });
         send("done", { reply: f.reply, lead_saved: f.leadSaved });
       } catch (e) {
         send("error", { message: String((e as Error).message) });
@@ -99,7 +101,7 @@ export function makeGraphRunner(graph: ReturnType<typeof buildGraph>): GraphRunn
           const kind = (msgs[i] as any)?._getType?.();
           if (kind === "ai" && typeof msgs[i].content === "string") { reply = msgs[i].content as string; break; }
         }
-        resolveFinal({ reply, leadSaved: !!lastState?.leadSaved, lead: lastState?.lead ?? {}, messages: msgs });
+        resolveFinal({ reply, leadSaved: !!lastState?.leadSaved, lead: lastState?.lead ?? {}, messages: msgs, uiComponent: lastState?.uiComponent ?? null });
       } catch (e) {
         rejectFinal(e);
         throw e;

@@ -81,4 +81,12 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toMatch(/preferredTime field verbatim/i);
     expect(prompt).toMatch(/do NOT confirm, schedule, or treat it as a booking/i);
   });
+  it("instructs actually calling show_time_picker rather than just describing it in text", () => {
+    expect(prompt).toMatch(/actually CALL the show_time_picker tool/i);
+    expect(prompt).toMatch(/never just describe it in words/i);
+  });
+  it("instructs never inventing a specific date/time itself", () => {
+    expect(prompt).toMatch(/NEVER state, invent, or imply a specific date\/time/i);
+    expect(prompt).toMatch(/call show_time_picker instead of guessing or making one up/i);
+  });
 });

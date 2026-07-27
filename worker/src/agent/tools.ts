@@ -20,3 +20,12 @@ export const saveLeadTool = tool(async (args: SaveLeadArgs) => JSON.stringify(ar
     "Record the visitor's lead. Call this ONLY when you have all of: name, email, and their message. Do not guess missing fields.",
   schema: saveLeadSchema,
 });
+
+// No side effects here either — the show_time_picker node sets the UI signal the SSE
+// stream forwards to the widget, which renders the picker inline in the chat.
+export const showTimePickerTool = tool(async () => "Time picker shown to visitor.", {
+  name: "show_time_picker",
+  description:
+    "Show an inline date/time picker in the chat UI for the visitor to specify their preferred time to connect. Call this INSTEAD of asking 'what time works for you?' in plain text, once the visitor has expressed interest in scheduling/connecting and you don't yet have a stated time preference from them. Don't call it if they've already given one.",
+  schema: z.object({}),
+});

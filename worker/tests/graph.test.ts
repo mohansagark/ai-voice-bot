@@ -186,3 +186,22 @@ describe("graph", () => {
   });
 });
 
+describe("show_time_picker tool", () => {
+  it("sets uiComponent and loops back to the agent for a natural follow-up reply", async () => {
+    const toolCall = new AIMessage({ content: "", tool_calls: [{ name: "show_time_picker", id: "c1", args: {} }] });
+    const followUp = new AIMessage("Sure — pick whatever works for you below!");
+    const { deps: d } = deps([toolCall, followUp]);
+    const g = buildGraph(d);
+    const out = await g.invoke({ messages: [new HumanMessage("I want to set up a call")] });
+    expect(out.uiComponent).toBe("time_picker");
+    expect(String(out.messages.at(-1)?.content)).toBe(followUp.content);
+  });
+
+  it("does not set uiComponent when the agent replies without calling the tool", async () => {
+    const { deps: d } = deps([new AIMessage("Sure, what works for you?")]);
+    const g = buildGraph(d);
+    const out = await g.invoke({ messages: [new HumanMessage("I want to set up a call")] });
+    expect(out.uiComponent).toBe(null);
+  });
+});
+

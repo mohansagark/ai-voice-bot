@@ -16,6 +16,10 @@ export const ChatState = Annotation.Root({
   // stays true for the rest of the session) so routing can tell "just saved, go
   // celebrate" apart from "already saved earlier, this was a no-op re-attempt."
   leadJustSaved: Annotation<boolean>({ reducer: (_, y) => y, default: () => false }),
+  // Set only on the turn the agent calls show_time_picker — never carried into the next
+  // turn's initial state (only leadSaved/lead are persisted across turns via the session
+  // store), so this naturally resets to null every fresh graph run.
+  uiComponent: Annotation<string | null>({ reducer: (_, y) => y, default: () => null }),
 });
 
 export type ChatStateType = typeof ChatState.State;
