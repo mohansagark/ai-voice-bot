@@ -16,5 +16,6 @@ export function buildModel(config: AppConfig, env: Env, provider = config.defaul
     apiKey,
     configuration: p.baseURL ? { baseURL: p.baseURL } : undefined,
     temperature: 0.3,
+    maxRetries: 0,
   }) as unknown as ChatModelLike;
 }

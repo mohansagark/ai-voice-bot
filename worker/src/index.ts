@@ -1,3 +1,11 @@
+// MUST be the very first import. The `openai` SDK (pulled in transitively by
+// @langchain/openai) auto-detects its runtime on first import of its shims and locks
+// that choice in permanently. Under this project's `nodejs_compat` flag, that
+// auto-detection resolves to the Node.js shim, which attaches a real `https.Agent` to
+// every fetch() call — something Cloudflare Workers' fetch() can't service, causing the
+// LLM call to hang forever with no error. Importing the web shim first forces the
+// correct (agent-free) runtime before anything else gets a chance to auto-detect wrong.
+import "openai/shims/web";
 import { loadConfig, type Env, type AppConfig, type Consent } from "./config";
 import { buildModel } from "./providers";
 import { buildGraph } from "./agent/graph";
