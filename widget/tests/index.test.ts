@@ -377,6 +377,40 @@ describe("mount", () => {
     }
   });
 
+  it("conversation mode: saying a farewell word ('bye') turns off the mic instead of restarting listening", async () => {
+    class FakeRecognition {
+      static last: FakeRecognition | null = null;
+      lang = ""; continuous = true; interimResults = true;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      startCalls = 0; stopCalls = 0;
+      constructor() { FakeRecognition.last = this; }
+      start() { this.startCalls++; }
+      stop() { this.stopCalls++; }
+    }
+    (window as any).SpeechRecognition = FakeRecognition;
+    try {
+      const store = memoryStore();
+      store.set("avb_consent", JSON.stringify({ agreed: true, timestamp: "2026-01-01", text: "x" }));
+      const fetchImpl = (async () => streamRes([sse("done", { reply: "Bye for now!", lead_saved: false })])) as unknown as typeof fetch;
+      const app = mount(baseCfg, { store, fetchImpl })!;
+      app.refs.mic.click();
+      const rec = FakeRecognition.last!;
+      expect(app.refs.mic.getAttribute("aria-pressed")).toBe("true");
+
+      rec.onresult!({ results: [{ isFinal: true, 0: { transcript: "bye bye" } }] });
+      rec.onend!();
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(app.refs.list.textContent).toContain("bye bye"); // the message still sends normally
+      expect(app.refs.mic.getAttribute("aria-pressed")).toBe("false"); // but conversation mode is off
+      expect(rec.startCalls).toBe(1); // never restarted listening after the farewell
+    } finally {
+      delete (window as any).SpeechRecognition;
+    }
+  });
+
   it("first-time visitor: auto-opens the panel and speaks the greeting after a delay, regardless of the mute default", async () => {
     vi.useFakeTimers();
     try {

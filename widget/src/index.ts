@@ -12,6 +12,7 @@ import { createVisualizer, type VisualizerDeps } from "./voice/visualizer";
 import { applyLevel } from "./voice/level-render";
 import { speakGreetingOnInteraction, type InteractionDeps } from "./voice/greet-on-interaction";
 import { createTypewriter } from "./typewriter";
+import { isFarewell } from "./farewell";
 
 export interface MountDeps {
   store?: Store;
@@ -148,6 +149,9 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
 
     const send = (text: string, voiceInitiated = false) => {
       emit(analytics, "message", { text, voiceInitiated });
+      // A farewell means the visitor is done — stop listening instead of making them
+      // reach for the mic button themselves.
+      if (conversationMode && isFarewell(text)) stopConversationMode();
       awaitingSpeechEnd = false; // cancel any pending restart tied to a previous, now-stale turn
       speaker?.stop();
       currentTypewriter?.stop(); // cut off any still-animating previous reply
