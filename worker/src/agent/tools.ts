@@ -7,6 +7,9 @@ export const saveLeadSchema = z.object({
   message: z.string().describe("What the visitor wants / their message to the owner"),
   phone: z.string().optional(),
   company: z.string().optional(),
+  preferredTime: z.string().optional().describe(
+    "The visitor's stated preferred date/time to connect, if given (e.g. from a '[Preferred time: ...]' marker in their message). Pass it through as-is — never confirm or schedule it.",
+  ),
 });
 export type SaveLeadArgs = z.infer<typeof saveLeadSchema>;
 

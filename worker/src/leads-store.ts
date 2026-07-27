@@ -6,6 +6,8 @@ export interface LeadRow {
   userAgent: string | null;
   referer: string | null;
   source: "agent" | "direct";
+  // The visitor's stated preferred date/time to connect, if given — never a confirmed booking.
+  preferredTime?: string | null;
 }
 
 export interface LeadsEnv {
@@ -26,7 +28,7 @@ export async function saveLead(env: LeadsEnv, row: LeadRow): Promise<void> {
   if (!env?.DB) throw new LeadStoreError("DB");
   await env.DB
     .prepare(
-      "INSERT INTO leads (email, name, question, session_id, source, user_agent, referer) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO leads (email, name, question, session_id, source, user_agent, referer, preferred_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(
       row.email,
@@ -36,6 +38,7 @@ export async function saveLead(env: LeadsEnv, row: LeadRow): Promise<void> {
       row.source,
       row.userAgent,
       row.referer,
+      row.preferredTime ?? null,
     )
     .run();
 }
@@ -49,17 +52,21 @@ function buildEmailBody(row: LeadRow): { subject: string; text: string; html: st
     ? `New portfolio lead: ${row.name} (${row.email})`
     : `New portfolio lead: ${row.email}`;
   const nameLine = row.name || "(none)";
+  const preferredTimeLine = row.preferredTime ? `Preferred time: ${row.preferredTime}\n` : "";
   const text =
     `Name: ${nameLine}\n` +
     `Email: ${row.email}\n` +
     `Source: ${row.source}\n` +
     `Session: ${row.sessionId || "(none)"}\n` +
+    preferredTimeLine +
     `Question:\n${row.question}`;
   const html =
     `<p><b>Name:</b> ${escapeHtml(nameLine)}<br/>` +
     `<b>Email:</b> ${escapeHtml(row.email)}<br/>` +
     `<b>Source:</b> ${escapeHtml(row.source)}<br/>` +
-    `<b>Session:</b> ${escapeHtml(row.sessionId || "(none)")}</p>` +
+    `<b>Session:</b> ${escapeHtml(row.sessionId || "(none)")}` +
+    (row.preferredTime ? `<br/><b>Preferred time:</b> ${escapeHtml(row.preferredTime)}` : "") +
+    `</p>` +
     `<p><b>Question:</b></p>` +
     `<p>${escapeHtml(row.question).replace(/\n/g, "<br/>")}</p>`;
   return { subject, text, html };

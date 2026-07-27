@@ -73,6 +73,17 @@ describe("graph", () => {
     expect(calls[0].email).toBe("jane@x.com");
   });
 
+  it("threads preferredTime from the tool call into the persisted lead row", async () => {
+    const toolCall = new AIMessage({
+      content: "",
+      tool_calls: [{ name: "save_lead", id: "c1", args: { name: "Jane", email: "jane@x.com", message: "hi", preferredTime: "Wed, Aug 5 — Afternoon" } }],
+    });
+    const { deps: d, calls } = deps([toolCall]);
+    const g = buildGraph(d);
+    await g.invoke({ messages: [new HumanMessage("[Preferred time: Wed, Aug 5 — Afternoon] I'm Jane, jane@x.com")] });
+    expect(calls[0].preferredTime).toBe("Wed, Aug 5 — Afternoon");
+  });
+
   it("does not save when the email is invalid (routes back to agent)", async () => {
     const badCall = new AIMessage({
       content: "",

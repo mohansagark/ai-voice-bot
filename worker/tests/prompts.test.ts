@@ -76,4 +76,9 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toMatch(/not write an email\/message draft/i);
     expect(prompt).toMatch(/capture their note via save_lead/i);
   });
+  it("instructs recognizing the [Preferred time: ...] marker and passing it to save_lead without scheduling", () => {
+    expect(prompt).toMatch(/\[Preferred time: \.\.\.\]/);
+    expect(prompt).toMatch(/preferredTime field verbatim/i);
+    expect(prompt).toMatch(/do NOT confirm, schedule, or treat it as a booking/i);
+  });
 });

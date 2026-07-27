@@ -45,7 +45,14 @@ describe("saveLead", () => {
       "agent",
       "Mozilla/5.0",
       "https://devmohan.in/",
+      null,
     ]);
+  });
+
+  it("includes preferredTime in the insert when given", async () => {
+    const { DB, calls } = fakeD1();
+    await saveLead({ DB }, { ...baseRow, preferredTime: "Wed, Aug 5 — Afternoon" });
+    expect((calls[0].binds as string[]).at(-1)).toBe("Wed, Aug 5 — Afternoon");
   });
 
   it("uses source='direct' when set", async () => {
@@ -166,5 +173,29 @@ describe("notifyLeadByEmail", () => {
     const arg = JSON.parse(fetchImpl.mock.calls[0][1].body as string);
     expect(arg.html).toContain("&lt;script&gt;");
     expect(arg.html).toContain("5 &lt; 10 &amp; ok?");
+  });
+
+  it("includes a Preferred time line in the email when given", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "msg_1" }), { status: 200 }));
+    await notifyLeadByEmail(
+      { RESEND_API_KEY: "re_x", LEAD_NOTIFY_FROM: "l@x.com", LEAD_NOTIFY_TO: "m@x.com" },
+      { ...baseRow, preferredTime: "Wed, Aug 5 — Afternoon" },
+      fetchImpl as unknown as typeof fetch,
+    );
+    const arg = JSON.parse(fetchImpl.mock.calls[0][1].body as string);
+    expect(arg.text).toContain("Preferred time: Wed, Aug 5 — Afternoon");
+    expect(arg.html).toContain("Preferred time:</b> Wed, Aug 5 — Afternoon");
+  });
+
+  it("omits the Preferred time line entirely when not given", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "msg_1" }), { status: 200 }));
+    await notifyLeadByEmail(
+      { RESEND_API_KEY: "re_x", LEAD_NOTIFY_FROM: "l@x.com", LEAD_NOTIFY_TO: "m@x.com" },
+      baseRow,
+      fetchImpl as unknown as typeof fetch,
+    );
+    const arg = JSON.parse(fetchImpl.mock.calls[0][1].body as string);
+    expect(arg.text).not.toContain("Preferred time");
+    expect(arg.html).not.toContain("Preferred time");
   });
 });

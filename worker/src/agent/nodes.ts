@@ -127,6 +127,7 @@ export function makeSaveLeadNode(deps: AgentDeps) {
       userAgent: null,
       referer: null,
       source: "agent",
+      preferredTime: d.preferredTime ?? null,
     };
     try {
       await deps.persistLead(row);
