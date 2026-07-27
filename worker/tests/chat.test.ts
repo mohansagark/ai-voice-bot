@@ -20,12 +20,23 @@ function memSessions() {
 }
 
 // A fake runner that records the messages it was given and streams scripted tokens + final.
-function fakeRunnerFactory(tokens: string[], final: Omit<GraphFinal, "messages" | "uiComponent"> & { uiComponent?: string | null }) {
+function fakeRunnerFactory(
+  tokens: string[],
+  final: Omit<GraphFinal, "messages" | "uiComponent" | "leadJustSaved"> & { uiComponent?: string | null; leadJustSaved?: boolean },
+) {
   const seen: BaseMessage[][] = [];
   const makeRunner = (_graph: unknown): GraphRunner => (messages) => {
     seen.push(messages);
     async function* gen() { for (const t of tokens) yield t; }
-    return { tokens: gen(), final: Promise.resolve({ uiComponent: null, ...final, messages: [...messages, new AIMessage(final.reply)] }) };
+    return {
+      tokens: gen(),
+      final: Promise.resolve({
+        uiComponent: null,
+        leadJustSaved: final.leadSaved, // tests assume a save this turn unless overridden
+        ...final,
+        messages: [...messages, new AIMessage(final.reply)],
+      }),
+    };
   };
   return { seen, makeRunner };
 }

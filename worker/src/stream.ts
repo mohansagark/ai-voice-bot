@@ -9,6 +9,9 @@ export function sse(event: string, data: unknown): string {
 export interface GraphFinal {
   reply: string;
   leadSaved: boolean;
+  // True only on the turn the lead was freshly persisted — distinct from leadSaved, which
+  // stays true for the rest of the session. Drives the one-time "lead" SSE event below.
+  leadJustSaved: boolean;
   lead: Lead;
   messages: BaseMessage[];
   uiComponent: string | null;
@@ -41,7 +44,11 @@ export function streamChatSSE(
           // Persisting this turn's memory must not abort delivery of the reply.
           try { await persist(f); } catch { /* memory of this turn lost; reply still delivered */ }
         }
-        if (f.leadSaved) send("lead", { saved: true, lead: f.lead });
+        // Fires ONLY the turn the lead is freshly saved, not on every subsequent turn of an
+        // already-saved session — f.leadSaved stays true forever once saved, which used to
+        // make the widget's "✓ sent" note (and its re-application of the visitor's stored
+        // name) spuriously reappear on every later reply.
+        if (f.leadJustSaved) send("lead", { saved: true, lead: f.lead });
         if (f.uiComponent) send("component", { type: f.uiComponent });
         send("done", { reply: f.reply, lead_saved: f.leadSaved });
       } catch (e) {
@@ -101,7 +108,14 @@ export function makeGraphRunner(graph: ReturnType<typeof buildGraph>): GraphRunn
           const kind = (msgs[i] as any)?._getType?.();
           if (kind === "ai" && typeof msgs[i].content === "string") { reply = msgs[i].content as string; break; }
         }
-        resolveFinal({ reply, leadSaved: !!lastState?.leadSaved, lead: lastState?.lead ?? {}, messages: msgs, uiComponent: lastState?.uiComponent ?? null });
+        resolveFinal({
+          reply,
+          leadSaved: !!lastState?.leadSaved,
+          leadJustSaved: !!lastState?.leadJustSaved,
+          lead: lastState?.lead ?? {},
+          messages: msgs,
+          uiComponent: lastState?.uiComponent ?? null,
+        });
       } catch (e) {
         rejectFinal(e);
         throw e;

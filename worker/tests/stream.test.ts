@@ -24,7 +24,7 @@ describe("sse", () => {
 
 describe("streamChatSSE", () => {
   it("streams token frames then a done frame, and sets SSE + CORS headers", async () => {
-    const final: GraphFinal = { reply: "Hi there", leadSaved: false, lead: {}, messages: [new AIMessage("Hi there")], uiComponent: null };
+    const final: GraphFinal = { reply: "Hi there", leadSaved: false, leadJustSaved: false, lead: {}, messages: [new AIMessage("Hi there")], uiComponent: null };
     const res = streamChatSSE(runFrom(["Hi ", "there"], final), cors);
     expect(res.headers.get("content-type")).toBe("text/event-stream");
     expect(res.headers.get("access-control-allow-origin")).toBe("https://devmohan.in");
@@ -35,8 +35,8 @@ describe("streamChatSSE", () => {
     expect(body).toContain(`"reply":"Hi there"`);
   });
 
-  it("emits a lead frame when the lead was saved, and calls persist", async () => {
-    const final: GraphFinal = { reply: "Saved!", leadSaved: true, lead: { email: "a@b.com" }, messages: [new AIMessage("Saved!")], uiComponent: null };
+  it("emits a lead frame when the lead was freshly saved this turn, and calls persist", async () => {
+    const final: GraphFinal = { reply: "Saved!", leadSaved: true, leadJustSaved: true, lead: { email: "a@b.com" }, messages: [new AIMessage("Saved!")], uiComponent: null };
     let persisted: GraphFinal | null = null;
     const res = streamChatSSE(runFrom(["Saved!"], final), cors, async (f) => void (persisted = f));
     const body = await bodyText(res);
@@ -47,8 +47,18 @@ describe("streamChatSSE", () => {
     expect((persisted as GraphFinal | null)?.leadSaved).toBe(true);
   });
 
+  it("does NOT emit a lead frame on a later turn of an already-saved session (leadSaved true, leadJustSaved false)", async () => {
+    // Regression test: leadSaved stays true for the rest of the session once a lead is
+    // saved, so gating on it (instead of leadJustSaved) used to fire the widget's "✓ sent"
+    // note on every subsequent reply, not just the turn that actually saved something.
+    const final: GraphFinal = { reply: "Sure, happy to help with that too!", leadSaved: true, leadJustSaved: false, lead: { email: "a@b.com" }, messages: [new AIMessage("Sure, happy to help with that too!")], uiComponent: null };
+    const res = streamChatSSE(runFrom(["Sure!"], final), cors);
+    const body = await bodyText(res);
+    expect(body).not.toContain(`event: lead`);
+  });
+
   it("emits an error frame (with CORS) when the token stream throws", async () => {
-    const final: GraphFinal = { reply: "", leadSaved: false, lead: {}, messages: [], uiComponent: null };
+    const final: GraphFinal = { reply: "", leadSaved: false, leadJustSaved: false, lead: {}, messages: [], uiComponent: null };
     const res = streamChatSSE(runFrom(["partial"], final, true), cors);
     expect(res.headers.get("access-control-allow-origin")).toBe("https://devmohan.in");
     const body = await bodyText(res);
@@ -57,7 +67,7 @@ describe("streamChatSSE", () => {
   });
 
   it("emits a component frame when the agent triggers a UI component", async () => {
-    const final: GraphFinal = { reply: "Sure, pick a time!", leadSaved: false, lead: {}, messages: [new AIMessage("Sure, pick a time!")], uiComponent: "time_picker" };
+    const final: GraphFinal = { reply: "Sure, pick a time!", leadSaved: false, leadJustSaved: false, lead: {}, messages: [new AIMessage("Sure, pick a time!")], uiComponent: "time_picker" };
     const res = streamChatSSE(runFrom(["Sure, pick a time!"], final), cors);
     const body = await bodyText(res);
     expect(body).toContain(`event: component`);
@@ -65,14 +75,14 @@ describe("streamChatSSE", () => {
   });
 
   it("omits the component frame when uiComponent is null", async () => {
-    const final: GraphFinal = { reply: "hi", leadSaved: false, lead: {}, messages: [new AIMessage("hi")], uiComponent: null };
+    const final: GraphFinal = { reply: "hi", leadSaved: false, leadJustSaved: false, lead: {}, messages: [new AIMessage("hi")], uiComponent: null };
     const res = streamChatSSE(runFrom(["hi"], final), cors);
     const body = await bodyText(res);
     expect(body).not.toContain(`event: component`);
   });
 
   it("still delivers done when persist rejects (non-fatal)", async () => {
-    const final: GraphFinal = { reply: "ok", leadSaved: false, lead: {}, messages: [new AIMessage("ok")], uiComponent: null };
+    const final: GraphFinal = { reply: "ok", leadSaved: false, leadJustSaved: false, lead: {}, messages: [new AIMessage("ok")], uiComponent: null };
     const res = streamChatSSE(runFrom(["ok"], final), cors, async () => { throw new Error("save failed"); });
     const body = await bodyText(res);
     expect(body).toContain(`event: done`);
