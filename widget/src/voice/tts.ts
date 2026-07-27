@@ -22,6 +22,23 @@ export function shouldSpeak(voiceInitiated: boolean, soundOn: boolean): boolean 
   return voiceInitiated || soundOn;
 }
 
+// Emoji read well in chat text but sound absurd spoken aloud ("smiling face with heart
+// eyes") — strip them before this text ever reaches a TTS engine. Removes every
+// pictographic codepoint individually (covers compound/ZWJ-joined emoji too, since each
+// component is itself pictographic), then cleans up leftover joiner/variation-selector
+// codepoints (built via fromCharCode, not a literal in source, to keep this file plain
+// ASCII) and any resulting double-spaces. Display text elsewhere is untouched.
+const JOINER_CHARS = String.fromCharCode(0x200d, 0xfe0f); // ZWJ, VARIATION SELECTOR-16
+const JOINER_RE = new RegExp(`[${JOINER_CHARS}]`, "gu");
+
+export function stripEmoji(text: string): string {
+  return text
+    .replace(/\p{Extended_Pictographic}/gu, "")
+    .replace(JOINER_RE, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 // After Groq's TTS endpoint rate-limits us (429), don't keep re-hitting it on every
 // subsequent turn in the same session — that just adds latency before falling back
 // anyway, and hammers an endpoint that's already saying "back off." Skip straight to
@@ -53,7 +70,10 @@ export function createSpeaker(cfg: SpeakerConfig, deps: SpeakerDeps = {}): Speak
   };
 
   return {
-    async speak(text: string): Promise<void> {
+    async speak(rawText: string): Promise<void> {
+      // Strip emoji once, up front — neither the neural TTS request nor the browser
+      // fallback should ever get raw emoji (both would read them out literally).
+      const text = stripEmoji(rawText);
       // A real playback error commonly fires BOTH audio.onerror AND rejects
       // the play() promise for the same failure; this guard ensures the
       // fallback only ever runs once per speak() call.

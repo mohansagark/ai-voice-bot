@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createSpeaker, shouldSpeak } from "../../src/voice/tts";
+import { createSpeaker, shouldSpeak, stripEmoji } from "../../src/voice/tts";
 
 function fakeAudio() {
   const a = { played: false, paused: false, onended: null as (() => void) | null, onerror: null as (() => void) | null,
@@ -16,8 +16,60 @@ describe("shouldSpeak", () => {
   });
 });
 
+describe("stripEmoji", () => {
+  const SMILE = String.fromCodePoint(0x1f604);
+  const ROCKET = String.fromCodePoint(0x1f680);
+  const HEART = String.fromCodePoint(0x2764) + String.fromCodePoint(0xfe0f); // base + variation selector-16
+  const MAN_TECHNOLOGIST = String.fromCodePoint(0x1f468) + String.fromCharCode(0x200d) + String.fromCodePoint(0x1f4bb); // ZWJ-joined compound
+
+  it("removes a simple emoji and trims resulting whitespace", () => {
+    expect(stripEmoji(`Great to meet you ${SMILE}`)).toBe("Great to meet you");
+  });
+
+  it("removes multiple emoji anywhere in the text", () => {
+    expect(stripEmoji(`${ROCKET} Let's go ${ROCKET}`)).toBe("Let's go");
+  });
+
+  it("removes emoji with a variation selector (e.g. heart)", () => {
+    expect(stripEmoji(`I love this ${HEART} project`)).toBe("I love this project");
+  });
+
+  it("removes ZWJ-joined compound emoji fully, not just the first component", () => {
+    expect(stripEmoji(`He's a ${MAN_TECHNOLOGIST} at heart`)).toBe("He's a at heart");
+  });
+
+  it("leaves plain text with no emoji untouched", () => {
+    expect(stripEmoji("Hey there, happy to help!")).toBe("Hey there, happy to help!");
+  });
+});
+
 describe("createSpeaker", () => {
   const cfg = { workerUrl: "https://w.test", voice: "hannah", lang: "en-US" };
+
+  it("strips emoji before sending text to the neural TTS endpoint", async () => {
+    const audio = fakeAudio();
+    let sentText = "";
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      sentText = JSON.parse(String(init?.body)).text;
+      return new Response("bytes", { status: 200 });
+    }) as unknown as typeof fetch;
+    const speaker = createSpeaker(cfg, { fetchImpl, makeAudio: () => audio });
+    await speaker.speak(`Great, all set! ${String.fromCodePoint(0x1f60a)}`);
+    expect(sentText).toBe("Great, all set!");
+  });
+
+  it("strips emoji before the browser-synth fallback too", async () => {
+    let utteranceText = "";
+    const fakeSynth = { speak: (u: { onend: (() => void) | null }) => { u.onend?.(); }, cancel: () => {} };
+    const fetchImpl = (async () => new Response("bad", { status: 500 })) as unknown as typeof fetch;
+    const speaker = createSpeaker(cfg, {
+      fetchImpl,
+      synth: fakeSynth,
+      makeUtterance: (text) => { utteranceText = text; return { lang: "en-US", onend: null }; },
+    });
+    await speaker.speak(`Sounds good! ${String.fromCodePoint(0x1f680)}`);
+    expect(utteranceText).toBe("Sounds good!");
+  });
 
   it("plays the neural audio and reports speaking then idle", async () => {
     const audio = fakeAudio();
