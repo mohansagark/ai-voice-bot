@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { saveLeadSchema, saveLeadTool } from "../src/agent/tools";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { buildGraph } from "../src/agent/graph";
+import { AGENT_INVOKE_TIMEOUT_MS } from "../src/agent/nodes";
 import type { ChatModelLike } from "../src/providers";
 import { defaultPersona } from "../src/config";
 import type { LeadRow } from "../src/leads-store";
@@ -137,6 +138,22 @@ describe("graph", () => {
     await g.invoke({ messages: [new HumanMessage("hello")] });
     const systemMsg = model.invocations[0]?.[0] as { content?: string };
     expect(String(systemMsg.content)).not.toContain("PORTFOLIO KNOWLEDGE");
+  });
+
+  it("times out a hung LLM invoke instead of hanging forever, surfacing a clear error", async () => {
+    vi.useFakeTimers();
+    try {
+      const hangingModel: ChatModelLike = {
+        bindTools: () => ({ invoke: () => new Promise(() => { /* never resolves */ }) }),
+      };
+      const g = buildGraph({ model: hangingModel, persona: defaultPersona, persistLead: async () => {} });
+      const promise = g.invoke({ messages: [new HumanMessage("hello")] });
+      const assertion = expect(promise).rejects.toThrow(/LLM invoke timed out/i);
+      await vi.advanceTimersByTimeAsync(AGENT_INVOKE_TIMEOUT_MS + 100);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

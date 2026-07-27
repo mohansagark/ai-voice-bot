@@ -14,6 +14,24 @@ export interface AgentDeps {
   persistLead: (row: LeadRow) => Promise<void>;
 }
 
+// Defensive ceiling on the LLM call: LangChain's OpenAI client has been observed to hang
+// indefinitely (no error, no resolution) under the Workers runtime for reasons still under
+// investigation — Groq itself and a raw fetch() to the same endpoint both respond in under
+// a second. Without this, a hung invoke leaves the visitor staring at "thinking..." forever.
+// The widget's error path already shows a generic "something hiccuped" message regardless
+// of this error's text, so no client-side change is needed to go with it.
+export const AGENT_INVOKE_TIMEOUT_MS = 20_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
+
 const INJECTION_PATTERNS = [
   /ignore (all |the )?(previous|prior|above) instructions/i,
   /system prompt/i,
@@ -49,7 +67,11 @@ export function makeAgentNode(deps: AgentDeps) {
           "IMPORTANT: You have already recorded this visitor's contact details this session. Do NOT ask for their name/email again and do NOT call save_lead again — just chat naturally and help with whatever they say next.",
         )]
       : [];
-    const reply = await bound.invoke([system, ...extra, ...state.messages]);
+    const reply = await withTimeout(
+      bound.invoke([system, ...extra, ...state.messages]),
+      AGENT_INVOKE_TIMEOUT_MS,
+      "LLM invoke",
+    );
     return { messages: [reply] };
   };
 }
