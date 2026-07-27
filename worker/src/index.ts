@@ -112,7 +112,7 @@ export function createApp(
         }
 
         if (enforce && state.turns + 1 > config.maxTurnsPerSession) {
-          return Response.json({ error: "too many turns" }, { status: 429, headers: cors });
+          return Response.json({ error: "too many turns", limitReached: true }, { status: 429, headers: cors });
         }
         const turns = state.turns + 1;
 

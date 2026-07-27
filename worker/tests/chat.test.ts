@@ -106,6 +106,10 @@ describe("/chat (SSE + session memory)", () => {
     const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
     const res = await app.fetch(chatReq({ session_id: "s1", message: "hi" }), env);
     expect(res.status).toBe(429);
+    // Distinct from a generic rate-limit 429 so the widget can show a friendly, honest
+    // message instead of the generic "something hiccuped" — this is a permanent per-session
+    // cap, not a transient failure, and telling visitors to "try again" would be misleading.
+    expect((await res.json() as any).limitReached).toBe(true);
   });
 
   it("health still works", async () => {
