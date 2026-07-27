@@ -11,6 +11,7 @@ import { createSpeaker, shouldSpeak, type SynthLike, type AudioLike } from "./vo
 import { createVisualizer, type VisualizerDeps } from "./voice/visualizer";
 import { applyLevel } from "./voice/level-render";
 import { speakGreetingOnInteraction, type InteractionDeps } from "./voice/greet-on-interaction";
+import { createTypewriter } from "./typewriter";
 
 export interface MountDeps {
   store?: Store;
@@ -49,6 +50,7 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
     let awaitingSpeechEnd = false;
     let speechWatchdog: ReturnType<typeof setTimeout> | null = null;
     let soundOn = session.soundOn(cfg.voice.speakByDefault);
+    let currentTypewriter: ReturnType<typeof createTypewriter> | null = null;
 
     const clearSpeechWatchdog = () => {
       if (speechWatchdog !== null) {
@@ -148,14 +150,20 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
       emit(analytics, "message", { text, voiceInitiated });
       awaitingSpeechEnd = false; // cancel any pending restart tied to a previous, now-stale turn
       speaker?.stop();
+      currentTypewriter?.stop(); // cut off any still-animating previous reply
       panel.addUser(text);
       orb.setThinking(true);
       const line = panel.startBot();
+      // Groq streams so fast that raw token chunks arrive in a near-instant burst —
+      // the typewriter re-paces reveal onto the screen so it reads like ChatGPT typing,
+      // independent of how quickly the model actually finished.
+      const typewriter = createTypewriter((chunk) => panel.appendBot(line, chunk));
+      currentTypewriter = typewriter;
       sendChat(
         cfg.workerUrl,
         { session_id: session.id(), message: text, consent: session.consent() ?? { agreed: false } },
         {
-          onToken: (t) => panel.appendBot(line, t),
+          onToken: (t) => typewriter.push(t),
           onLead: (lead) => {
             const nm = (lead as { name?: string })?.name;
             if (nm && typeof nm === "string" && cfg.behavior.rememberReturning) session.setName(nm.split(" ")[0]);
@@ -163,7 +171,17 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
             emit(analytics, "lead", lead);
           },
           onDone: (reply) => {
-            panel.endBot(line, reply);
+            // Safety net: if the streamed tokens didn't exactly reconstruct the final
+            // reply (chunking edge cases), queue the missing suffix so the visible text
+            // still converges on the true final reply once the typewriter drains it —
+            // rather than jump-cutting over already-animating text.
+            const pushed = typewriter.pushed();
+            if (reply && reply !== pushed) {
+              if (reply.startsWith(pushed)) typewriter.push(reply.slice(pushed.length));
+              else { typewriter.stop(); panel.endBot(line, reply); }
+            } else if (!pushed) {
+              panel.endBot(line); // nothing streamed at all -> ellipsis fallback
+            }
             orb.setThinking(false);
             awaitingReply = false;
             if (shouldSpeak(voiceInitiated, soundOn) && speaker) {

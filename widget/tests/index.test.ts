@@ -32,8 +32,9 @@ describe("mount", () => {
     const consentBtn = app.refs.list.querySelector(".consent button") as HTMLButtonElement;
     expect(consentBtn).toBeTruthy();
     consentBtn.click();
-    // the user message is rendered immediately; wait a tick for the stream
-    await new Promise((r) => setTimeout(r, 0));
+    // the user message is rendered immediately; wait for the stream AND the
+    // typewriter's real setInterval to drain the (short) reply onto the screen.
+    await new Promise((r) => setTimeout(r, 100));
     expect(app.refs.list.textContent).toContain("hello");
     expect(app.refs.list.textContent).toContain("Hey");
   });
@@ -118,12 +119,14 @@ describe("mount", () => {
       app.refs.mic.click(); // start listening — createRecognizer() constructed FakeRecognition.last at mount time
       expect(app.refs.orb.classList.contains("listening")).toBe(true);
       // Simulate the browser delivering a transcript on the actual recognizer instance index.ts is holding.
-      FakeRecognition.last!.onresult!({ results: [[{ transcript: "what do you do" }]] });
+      FakeRecognition.last!.onresult!({ results: [{ isFinal: true, 0: { transcript: "what do you do" } }] });
+      FakeRecognition.last!.onend!(); // silence timeout elapsed -> recognizer delivers the final transcript
       expect(app.refs.input.value).toBe(""); // panel's submit handler already cleared it
       const consentBtn = app.refs.list.querySelector(".consent button") as HTMLButtonElement;
       expect(consentBtn).toBeTruthy(); // first message still gates on consent, even from voice
       consentBtn.click();
-      await new Promise((r) => setTimeout(r, 0));
+      // wait for the stream AND the typewriter's real setInterval to drain the reply.
+      await new Promise((r) => setTimeout(r, 200));
       expect(app.refs.list.textContent).toContain("what do you do");
       expect(app.refs.list.textContent).toContain("Hey there");
       expect(ttsCalls.length).toBeGreaterThan(0);
@@ -211,7 +214,8 @@ describe("mount", () => {
       app.refs.mic.click(); // conversation mode on — tap 1
       const rec = FakeRecognition.last!;
       expect(rec.startCalls).toBe(1);
-      rec.onresult!({ results: [[{ transcript: "what do you do" }]] });
+      rec.onresult!({ results: [{ isFinal: true, 0: { transcript: "what do you do" } }] });
+      rec.onend!(); // silence timeout elapsed -> recognizer delivers the final transcript
       (app.refs.list.querySelector(".consent button") as HTMLButtonElement).click(); // first message still gates on consent
       await new Promise((r) => setTimeout(r, 0));
       expect(audio.played).toBe(true); // Leo is "speaking" the reply
@@ -246,7 +250,8 @@ describe("mount", () => {
       app.refs.orb.click();
       app.refs.mic.click(); // conversation mode on
       const rec = FakeRecognition.last!;
-      rec.onresult!({ results: [[{ transcript: "what do you do" }]] });
+      rec.onresult!({ results: [{ isFinal: true, 0: { transcript: "what do you do" } }] });
+      rec.onend!(); // silence timeout elapsed -> recognizer delivers the final transcript
       (app.refs.list.querySelector(".consent button") as HTMLButtonElement).click();
       await new Promise((r) => setTimeout(r, 0));
       app.refs.mic.click(); // taps off while Leo is still "speaking"
@@ -284,7 +289,8 @@ describe("mount", () => {
       app.refs.mic.click(); // conversation mode on — tap 1
       const rec = FakeRecognition.last!;
       expect(rec.startCalls).toBe(1);
-      rec.onresult!({ results: [[{ transcript: "what do you do" }]] });
+      rec.onresult!({ results: [{ isFinal: true, 0: { transcript: "what do you do" } }] });
+      rec.onend!(); // silence timeout elapsed -> recognizer delivers the final transcript
       (app.refs.list.querySelector(".consent button") as HTMLButtonElement).click(); // first message still gates on consent
       await vi.advanceTimersByTimeAsync(0); // let the streamed reply's onDone fire
       expect(rec.startCalls).toBe(1); // stalled: awaitingSpeechEnd is true but onState never reaches "idle"
@@ -314,7 +320,8 @@ describe("mount", () => {
       app.refs.mic.click();
       const rec = FakeRecognition.last!;
       expect(rec.startCalls).toBe(1);
-      rec.onresult!({ results: [[{ transcript: "   " }]] }); // whitespace-only -> treated as empty
+      rec.onresult!({ results: [{ isFinal: true, 0: { transcript: "   " } }] }); // whitespace-only -> treated as empty
+      rec.onend!(); // silence timeout elapsed with nothing meaningful captured
       expect(rec.startCalls).toBe(2); // restarted immediately, no send() involved
       expect(app.refs.list.children.length).toBe(0); // nothing was sent/rendered
     } finally {
