@@ -38,7 +38,9 @@ export interface Env {
   LEAD_NOTIFY_FROM?: string;
   LEAD_NOTIFY_TO?: string;
   DB?: D1Database;
-  LEAD_EMAIL?: { send(msg: { from: string; to: string; subject: string; text: string; html: string }): Promise<{ success: boolean }> };
+  // Resend API key for lead notification emails — not Cloudflare Email Sending, which is
+  // gated behind the Workers Paid plan.
+  RESEND_API_KEY?: string;
   // Optional, deployment-specific: a large formatted text blob of the site owner's full
   // portfolio data (projects, experience, skills, etc), fetched at request time under the
   // key "context". A KV namespace (not a secret/var) because secrets cap at 5.1KB and this

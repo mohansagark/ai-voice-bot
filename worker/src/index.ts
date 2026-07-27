@@ -115,7 +115,7 @@ export function createApp(
         const persistLeadFn = deps.persistLead ?? (async (row: LeadRow) => {
           try { await persistLeadToD1(env as any, row); }
           catch (e) { console.error("saveLead (D1) failed:", String((e as Error).message)); throw e; }
-          try { await notifyLeadByEmail(env as any, row); } catch { /* swallowed inside */ }
+          try { await notifyLeadByEmail(env as any, row, deps.fetchImpl ?? fetch); } catch { /* swallowed inside */ }
         });
 
         let portfolioContext = "";

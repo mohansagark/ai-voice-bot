@@ -8,21 +8,11 @@ export interface LeadRow {
   source: "agent" | "direct";
 }
 
-export interface LeadEmailBinding {
-  send(msg: {
-    from: string;
-    to: string;
-    subject: string;
-    text: string;
-    html: string;
-  }): Promise<{ success: boolean }>;
-}
-
 export interface LeadsEnv {
   DB?: D1Database;
   LEAD_NOTIFY_FROM?: string;
   LEAD_NOTIFY_TO?: string;
-  LEAD_EMAIL?: LeadEmailBinding;
+  RESEND_API_KEY?: string;
 }
 
 export class LeadStoreError extends Error {
@@ -75,18 +65,22 @@ function buildEmailBody(row: LeadRow): { subject: string; text: string; html: st
   return { subject, text, html };
 }
 
-export async function notifyLeadByEmail(env: LeadsEnv, row: LeadRow): Promise<void> {
+// Resend, not Cloudflare Email Sending — the latter is gated behind the Workers Paid
+// plan. Resend's free tier (3,000/mo, 100/day) needs only an API key, no plan upgrade.
+export async function notifyLeadByEmail(env: LeadsEnv, row: LeadRow, fetchImpl: typeof fetch = fetch): Promise<void> {
   if (!env.LEAD_NOTIFY_FROM || !env.LEAD_NOTIFY_TO) return;
-  if (!env.LEAD_EMAIL) return;
+  if (!env.RESEND_API_KEY) return;
   const { subject, text, html } = buildEmailBody(row);
   try {
-    await env.LEAD_EMAIL.send({
-      from: env.LEAD_NOTIFY_FROM,
-      to: env.LEAD_NOTIFY_TO,
-      subject,
-      text,
-      html,
+    const res = await fetchImpl("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${env.RESEND_API_KEY}` },
+      body: JSON.stringify({ from: env.LEAD_NOTIFY_FROM, to: env.LEAD_NOTIFY_TO, subject, text, html }),
     });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`notifyLeadByEmail failed (D1 row already saved): resend error ${res.status}${body ? ` — ${body}` : ""}`);
+    }
   } catch (e) {
     console.error("notifyLeadByEmail failed (D1 row already saved):", String((e as Error).message));
   }

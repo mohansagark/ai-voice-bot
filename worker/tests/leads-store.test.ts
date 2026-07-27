@@ -74,44 +74,51 @@ describe("saveLead", () => {
 
 describe("notifyLeadByEmail", () => {
   it("is a no-op when LEAD_NOTIFY_FROM is missing", async () => {
-    const send = vi.fn();
+    const fetchImpl = vi.fn();
     await notifyLeadByEmail(
-      { LEAD_EMAIL: { send } as any, LEAD_NOTIFY_TO: "m@x.com" },
+      { RESEND_API_KEY: "re_x", LEAD_NOTIFY_TO: "m@x.com" },
       baseRow,
+      fetchImpl,
     );
-    expect(send).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("is a no-op when LEAD_NOTIFY_TO is missing", async () => {
-    const send = vi.fn();
+    const fetchImpl = vi.fn();
     await notifyLeadByEmail(
-      { LEAD_EMAIL: { send } as any, LEAD_NOTIFY_FROM: "Leo <l@x.com>" },
+      { RESEND_API_KEY: "re_x", LEAD_NOTIFY_FROM: "Leo <l@x.com>" },
       baseRow,
+      fetchImpl,
     );
-    expect(send).not.toHaveBeenCalled();
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("is a no-op when LEAD_EMAIL binding is missing", async () => {
-    await expect(
-      notifyLeadByEmail(
-        { LEAD_NOTIFY_FROM: "Leo <l@x.com>", LEAD_NOTIFY_TO: "m@x.com" },
-        baseRow,
-      ),
-    ).resolves.toBeUndefined();
+  it("is a no-op when RESEND_API_KEY is missing", async () => {
+    const fetchImpl = vi.fn();
+    await notifyLeadByEmail(
+      { LEAD_NOTIFY_FROM: "Leo <l@x.com>", LEAD_NOTIFY_TO: "m@x.com" },
+      baseRow,
+      fetchImpl,
+    );
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("calls LEAD_EMAIL.send with the expected shape when fully configured", async () => {
-    const send = vi.fn().mockResolvedValue({ success: true });
+  it("calls Resend's REST API with the expected shape when fully configured", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "msg_1" }), { status: 200 }));
     await notifyLeadByEmail(
       {
-        LEAD_EMAIL: { send } as any,
+        RESEND_API_KEY: "re_x",
         LEAD_NOTIFY_FROM: "Leo <leo@devmohan.in>",
         LEAD_NOTIFY_TO: "mohan@devmohan.in",
       },
       baseRow,
+      fetchImpl as unknown as typeof fetch,
     );
-    expect(send).toHaveBeenCalledTimes(1);
-    const arg = send.mock.calls[0][0];
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe("https://api.resend.com/emails");
+    expect((init.headers as Record<string, string>).authorization).toBe("Bearer re_x");
+    const arg = JSON.parse(init.body as string);
     expect(arg.from).toBe("Leo <leo@devmohan.in>");
     expect(arg.to).toBe("mohan@devmohan.in");
     expect(arg.subject).toContain("jane@example.com");
@@ -121,17 +128,28 @@ describe("notifyLeadByEmail", () => {
     expect(arg.html).toContain("Jane");
   });
 
-  it("swallows LEAD_EMAIL.send failures (D1 is the source of truth)", async () => {
-    const send = vi.fn().mockRejectedValue(new Error("smtp down"));
+  it("swallows Resend failures, network or non-OK (D1 is the source of truth)", async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new Error("network down"));
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(
       notifyLeadByEmail(
-        {
-          LEAD_EMAIL: { send } as any,
-          LEAD_NOTIFY_FROM: "Leo <l@x.com>",
-          LEAD_NOTIFY_TO: "m@x.com",
-        },
+        { RESEND_API_KEY: "re_x", LEAD_NOTIFY_FROM: "Leo <l@x.com>", LEAD_NOTIFY_TO: "m@x.com" },
         baseRow,
+        fetchImpl as unknown as typeof fetch,
+      ),
+    ).resolves.toBeUndefined();
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+
+  it("logs but does not throw when Resend responds non-OK", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response("bad request", { status: 422 }));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      notifyLeadByEmail(
+        { RESEND_API_KEY: "re_x", LEAD_NOTIFY_FROM: "Leo <l@x.com>", LEAD_NOTIFY_TO: "m@x.com" },
+        baseRow,
+        fetchImpl as unknown as typeof fetch,
       ),
     ).resolves.toBeUndefined();
     expect(errSpy).toHaveBeenCalled();
@@ -139,16 +157,13 @@ describe("notifyLeadByEmail", () => {
   });
 
   it("escapes HTML special characters in the question", async () => {
-    const send = vi.fn().mockResolvedValue({ success: true });
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "msg_1" }), { status: 200 }));
     await notifyLeadByEmail(
-      {
-        LEAD_EMAIL: { send } as any,
-        LEAD_NOTIFY_FROM: "l@x.com",
-        LEAD_NOTIFY_TO: "m@x.com",
-      },
+      { RESEND_API_KEY: "re_x", LEAD_NOTIFY_FROM: "l@x.com", LEAD_NOTIFY_TO: "m@x.com" },
       { ...baseRow, name: "<script>", question: "is 5 < 10 & ok?" },
+      fetchImpl as unknown as typeof fetch,
     );
-    const arg = send.mock.calls[0][0];
+    const arg = JSON.parse(fetchImpl.mock.calls[0][1].body as string);
     expect(arg.html).toContain("&lt;script&gt;");
     expect(arg.html).toContain("5 &lt; 10 &amp; ok?");
   });

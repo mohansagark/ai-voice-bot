@@ -19,11 +19,10 @@ database_id = "9f95be6d-0023-4360-8baa-2648add6eaf8"
 binding = "PORTFOLIO_KV"
 id = "0ac98a2a6f5f428aafa4dd9e1d3f2feb"
 
-# Optional: only required if you want email notifications on new leads.
-# Uncomment after enabling Email Routing for `devmohan.in` and verifying `contact@devmohan.in`.
-# [[send_email]]
-# name = "LEAD_EMAIL"
-# destination_address = "contact@devmohan.in"
+# Email notifications on new leads use Resend (not Cloudflare Email Sending, which is
+# gated behind the Workers Paid plan) — set RESEND_API_KEY, LEAD_NOTIFY_FROM, and
+# LEAD_NOTIFY_TO as secrets via `wrangler secret put`. All optional; leads still save to
+# D1 without them, just without an email ping.
 
 [vars]
 ALLOWED_ORIGINS = "https://devmohan.in,https://www.devmohan.in"
