@@ -124,4 +124,28 @@ describe("createSpeaker", () => {
     await speaker.speak("Hi there");
     expect(spoken).toEqual(["en-US"]);
   });
+
+  it("after a 429, skips calling /tts on the next turn and goes straight to browser voice", async () => {
+    const synth = { speak: () => {}, cancel: () => {} };
+    let ttsCalls = 0;
+    const fetchImpl = (async () => {
+      ttsCalls++;
+      return new Response("rate limited", { status: 429 });
+    }) as unknown as typeof fetch;
+    const speaker = createSpeaker(cfg, { fetchImpl, synth, makeUtterance: (text, lang) => ({ text, lang, onend: null } as any) });
+    await speaker.speak("first");
+    expect(ttsCalls).toBe(1); // first call still hits the network and discovers the 429
+    await speaker.speak("second");
+    expect(ttsCalls).toBe(1); // second call is skipped — still in cooldown
+  });
+
+  it("a non-429 failure does not trigger the rate-limit cooldown", async () => {
+    const synth = { speak: () => {}, cancel: () => {} };
+    let ttsCalls = 0;
+    const fetchImpl = (async () => { ttsCalls++; return new Response("bad", { status: 500 }); }) as unknown as typeof fetch;
+    const speaker = createSpeaker(cfg, { fetchImpl, synth, makeUtterance: (text, lang) => ({ text, lang, onend: null } as any) });
+    await speaker.speak("first");
+    await speaker.speak("second");
+    expect(ttsCalls).toBe(2); // a plain 500 doesn't suppress the next attempt
+  });
 });
