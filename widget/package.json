@@ -44,5 +44,8 @@
     "happy-dom": "^15.0.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "cally": "^0.9.2"
   }
 }

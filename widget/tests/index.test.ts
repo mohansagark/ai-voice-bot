@@ -39,6 +39,19 @@ describe("mount", () => {
     expect(app.refs.list.textContent).toContain("Hey");
   });
 
+  it("slot picker: confirming a time prefills the message input without sending it", () => {
+    const fetchImpl = vi.fn();
+    const app = mount(baseCfg, { store: memoryStore(), fetchImpl: fetchImpl as unknown as typeof fetch })!;
+    app.refs.slotToggle.click();
+    app.refs.slotDate.value = "2026-08-05";
+    app.refs.slotDate.dispatchEvent(new Event("change"));
+    app.refs.slotTime.value = "09:00";
+    app.refs.slotTime.dispatchEvent(new Event("change"));
+    app.refs.slotConfirm.click();
+    expect(app.refs.input.value).toBe("[Preferred time: Wed, Aug 5 — 9:00 AM]");
+    expect(fetchImpl).not.toHaveBeenCalled(); // prefilled only, visitor still has to hit send
+  });
+
   it("greets a returning visitor by stored name", () => {
     const store = memoryStore(); store.set("avb_name", "Alex");
     const app = mount(baseCfg, { store, fetchImpl: fetch })!;

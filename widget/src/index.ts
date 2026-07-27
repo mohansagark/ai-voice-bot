@@ -12,6 +12,7 @@ import { createVisualizer, type VisualizerDeps } from "./voice/visualizer";
 import { applyLevel } from "./voice/level-render";
 import { speakGreetingOnInteraction, type InteractionDeps } from "./voice/greet-on-interaction";
 import { createTypewriter } from "./typewriter";
+import { wireSlotPicker } from "./slotpicker";
 
 export interface MountDeps {
   store?: Store;
@@ -224,6 +225,13 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
       if (consentPending) return;
       consentPending = true;
       panel.showConsent(cfg, () => { consentPending = false; session.setConsent(cfg.privacy.consentText); send(text, voiceInitiated); });
+    });
+
+    // Prefills the message input rather than auto-sending, so the visitor can add context
+    // (or change their mind) before it goes out — same as if they'd typed it themselves.
+    wireSlotPicker(refs, (formatted) => {
+      refs.input.value = refs.input.value ? `${refs.input.value} ${formatted}` : formatted;
+      refs.input.focus();
     });
 
     const setListeningVisual = (on: boolean) => {

@@ -88,6 +88,15 @@ export function css(theme: string, theme2: string): string {
   .consent { align-self: stretch; background: #f7f6fb; border: 1px solid #e2dff0; border-radius: 12px; padding: 12px; font-size: 13px; color: #4a4560; }
   .consent a { color: ${theme}; }
   .consent button { margin-top: 8px; background: ${theme}; color: #fff; border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+  .slotpicker { display: flex; flex-direction: column; gap: 8px; padding: 10px 14px; border-top: 1px solid #2a2638; max-height: 260px; overflow-y: auto; }
+  .slotpicker[hidden] { display: none; }
+  .slot-date {
+    align-self: center; color-scheme: dark; color: #eae7f2; background: #241f30;
+    border-radius: 8px; padding: 8px; --color-accent: ${theme}; --color-text-on-accent: #fff;
+  }
+  .slot-time { padding: 8px 10px; border: 1px solid #332d42; background: #241f30; color: #eae7f2; border-radius: 8px; font-size: 13px; color-scheme: dark; }
+  .slot-confirm { align-self: flex-start; background: linear-gradient(120deg, ${theme}, ${theme2}); border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; color: #fff; cursor: pointer; }
+  .slot-confirm:disabled { opacity: .4; cursor: not-allowed; }
   form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #2a2638; }
   input { width: 100%; padding: 10px 12px; border: 1px solid #332d42; background: #241f30; color: #eae7f2; border-radius: 10px; font-size: 14px; }
   input::placeholder { color: #756e8a; }

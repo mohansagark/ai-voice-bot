@@ -64,4 +64,15 @@ describe("mountShell", () => {
     expect(send.querySelector("svg")).toBeTruthy();
     expect(send.textContent?.trim()).toBe("");
   });
+
+  it("mounts a slot-time picker (toggle, Cally calendar, time input, confirm), hidden by default", () => {
+    const refs = mountShell(cfg);
+    expect(refs.shadow.contains(refs.slotToggle)).toBe(true);
+    expect(refs.shadow.contains(refs.slotPicker)).toBe(true);
+    expect(refs.slotPicker.hasAttribute("hidden")).toBe(true);
+    expect(refs.slotDate.tagName.toLowerCase()).toBe("calendar-date");
+    expect(refs.slotDate.querySelector("calendar-month")).toBeTruthy();
+    expect(refs.slotTime.getAttribute("type")).toBe("time");
+    expect(refs.slotConfirm.disabled).toBe(true);
+  });
 });
