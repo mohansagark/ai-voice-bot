@@ -97,4 +97,16 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toMatch(/Phone and company are OPTIONAL on save_lead/i);
     expect(prompt).toMatch(/never ask for them, insist on them, or suggest a "placeholder" value/i);
   });
+  it("instructs not fully solving the visitor's stated need instead of capturing it as their message", () => {
+    expect(prompt).toMatch(/don't fully solve or advise on it yourself/i);
+    expect(prompt).toMatch(/keep moving toward save_lead/i);
+  });
+  it("instructs never giving out an email address (his or the visitor's) as a contact method", () => {
+    expect(prompt).toMatch(/NEVER give out an email address as "the way to reach him"/i);
+    expect(prompt).toMatch(/not the visitor's own either/i);
+  });
+  it("instructs never confirming a visitor-proposed time stated in plain text as booked", () => {
+    expect(prompt).toMatch(/is NOT a confirmed booking/i);
+    expect(prompt).toMatch(/never say "works for me," "I'll lock it in," "consider it booked,"/i);
+  });
 });
