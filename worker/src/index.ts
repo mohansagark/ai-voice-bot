@@ -8,6 +8,8 @@ import { SessionDO } from "./session-do";
 import { isSpam } from "./spam";
 import { streamChatSSE, makeGraphRunner, blockedResponse, type GraphRunner, type GraphFinal } from "./stream";
 import { synthesizeSpeech } from "./tts";
+import { isValidEmail } from "./leads";
+import { saveLead as persistLeadToD1, notifyLeadByEmail, type LeadRow } from "./leads-store";
 
 export interface SessionHandle {
   load(): Promise<SessionState>;
@@ -20,11 +22,22 @@ function doGetSession(env: Env, sessionId: string): SessionHandle {
   return { load: () => stub.load(), save: (s) => stub.save(s) };
 }
 
+// Default portfolio-context accessor: reads the "context" key from the (optional) KV
+// namespace. Absent binding or a lookup failure both just mean "no extra context" —
+// Leo still works fine on the abridged persona facts alone.
+async function getPortfolioContext(env: Env): Promise<string> {
+  if (!env.PORTFOLIO_KV) return "";
+  try { return (await env.PORTFOLIO_KV.get("context")) ?? ""; }
+  catch (e) { console.error("PORTFOLIO_KV read failed (continuing without it):", String((e as Error).message)); return ""; }
+}
+
 export interface Deps {
   buildModel: typeof buildModel;
   getSession: (env: Env, sessionId: string) => SessionHandle;
   makeRunner: (graph: ReturnType<typeof buildGraph>) => GraphRunner;
   fetchImpl?: typeof fetch;
+  persistLead?: (row: LeadRow) => Promise<void>;
+  getPortfolioContext?: (env: Env) => Promise<string>;
 }
 
 function corsHeaders(origin: string, allowed: string[], allowAll = false): Record<string, string> {
@@ -39,7 +52,11 @@ function corsHeaders(origin: string, allowed: string[], allowAll = false): Recor
 interface ChatBody { session_id?: string; message?: string; consent?: Consent; }
 
 export function createApp(
-  deps: Deps = { buildModel, getSession: doGetSession, makeRunner: makeGraphRunner },
+  deps: Deps = {
+    buildModel,
+    getSession: doGetSession,
+    makeRunner: makeGraphRunner,
+  },
 ) {
   return {
     async fetch(request: Request, env: Env): Promise<Response> {
@@ -54,7 +71,7 @@ export function createApp(
       if (url.pathname === "/health") {
         const p = config.providers[config.defaultProvider];
         return Response.json(
-          { ok: true, provider: config.defaultProvider, model: p?.model, tts: env.GROQ_API_KEY ? "groq" : "browser", leads: env.WEBHOOK_URL ? "webhook" : "none", mode: config.mode },
+          { ok: true, provider: config.defaultProvider, model: p?.model, tts: env.GROQ_API_KEY ? "groq" : "browser", leads: env.DB ? "d1" : "none", mode: config.mode },
           { headers: cors },
         );
       }
@@ -95,13 +112,23 @@ export function createApp(
         try { model = deps.buildModel(config, env); }
         catch (e) { return Response.json({ error: String((e as Error).message) }, { status: 500, headers: cors }); }
 
-        const graph = buildGraph({ model, persona: config.persona, webhookUrl: env.WEBHOOK_URL || "" });
+        const persistLeadFn = deps.persistLead ?? (async (row: LeadRow) => {
+          try { await persistLeadToD1(env as any, row); }
+          catch (e) { console.error("saveLead (D1) failed:", String((e as Error).message)); throw e; }
+          try { await notifyLeadByEmail(env as any, row); } catch { /* swallowed inside */ }
+        });
+
+        let portfolioContext = "";
+        try { portfolioContext = await (deps.getPortfolioContext ?? getPortfolioContext)(env); }
+        catch (e) { console.error("getPortfolioContext failed (continuing without it):", String((e as Error).message)); }
+        const graph = buildGraph({ model, persona: config.persona, portfolioContext, persistLead: persistLeadFn });
         const history = deserializeMessages(state.messages);
         const messages = [...history, new HumanMessage(body.message)];
-        const run = deps.makeRunner(graph)(messages, body.consent ?? { agreed: false }, {
-          leadSaved: state.leadSaved ?? false,
-          lead: state.lead,
-        });
+        const run = deps.makeRunner(graph)(
+          messages,
+          body.consent ?? { agreed: false },
+          { leadSaved: state.leadSaved ?? false, lead: state.lead },
+        );
 
         const persist = async (f: GraphFinal): Promise<void> => {
           await handle.save({
@@ -113,6 +140,37 @@ export function createApp(
         };
 
         return streamChatSSE(run, cors, persist);
+      }
+
+      if (url.pathname === "/lead" && request.method === "POST") {
+        if (enforce && config.allowedOrigins.length && !config.allowedOrigins.includes(origin)) {
+          return Response.json({ error: "origin not allowed" }, { status: 403, headers: cors });
+        }
+        const body = (await request.json().catch(() => null)) as {
+          email?: string; name?: string; question?: string; sessionId?: string;
+        } | null;
+        const email = (body?.email ?? "").trim().toLowerCase();
+        const name = (body?.name ?? "").trim().slice(0, 100) || null;
+        const question = (body?.question ?? "").trim();
+        const sessionId = (body?.sessionId ?? "").trim() || null;
+        if (!email || !isValidEmail(email)) return Response.json({ error: "valid email required" }, { status: 400, headers: cors });
+        if (!question || question.length < 4) return Response.json({ error: "question required" }, { status: 400, headers: cors });
+        if (question.length > 2000) return Response.json({ error: "question too long" }, { status: 400, headers: cors });
+        const row: LeadRow = {
+          email, name, question, sessionId,
+          userAgent: request.headers.get("user-agent") || null,
+          referer: request.headers.get("referer") || null,
+          source: "direct",
+        };
+        try {
+          await persistLeadToD1(env as any, row);
+        } catch (e) {
+          console.error("/lead D1 insert failed:", String((e as Error).message));
+          return Response.json({ error: "could not save lead" }, { status: 500, headers: cors });
+        }
+        // Email notify is best-effort and async.
+        try { await notifyLeadByEmail(env as any, row); } catch { /* swallowed inside */ }
+        return Response.json({ ok: true }, { status: 200, headers: cors });
       }
 
       if (url.pathname === "/tts" && request.method === "POST") {

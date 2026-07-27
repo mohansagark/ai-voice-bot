@@ -51,4 +51,25 @@ describe("buildSystemPrompt", () => {
   it("does not hardcode a specific personality example into the generic instruction text", () => {
     expect(prompt).not.toMatch(/sharp, hands-on problem-solver who genuinely loves the hard stuff/i);
   });
+  it("omits the portfolio knowledge block entirely when no portfolioContext is configured", () => {
+    expect(prompt).not.toContain("PORTFOLIO KNOWLEDGE");
+  });
+  it("includes the full portfolio knowledge block when portfolioContext is configured", () => {
+    const withContext = buildSystemPrompt(defaultPersona, "=== PROJECTS ===\n- Widget Thing: a thing.");
+    expect(withContext).toContain("PORTFOLIO KNOWLEDGE");
+    expect(withContext).toContain("=== PROJECTS ===");
+    expect(withContext).toContain("Widget Thing");
+  });
+  it("instructs against mashing two real things together into a fabricated answer", () => {
+    expect(prompt).toMatch(/don't guess/i);
+    expect(prompt).toMatch(/mashing two real things together/i);
+  });
+  it("allows one clarifying guess for a likely mis-transcribed term, without assuming", () => {
+    expect(prompt).toMatch(/did you mean/i);
+    expect(prompt).toMatch(/never just assume and answer/i);
+  });
+  it("instructs asking for the visitor's first name early, separate from the save_lead flow", () => {
+    expect(prompt).toMatch(/within your first reply or two/i);
+    expect(prompt).toMatch(/separate from.*save_lead/i);
+  });
 });

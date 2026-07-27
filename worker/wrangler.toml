@@ -7,6 +7,24 @@ routes = [
   { pattern = "voicebot.devmohan.in", custom_domain = true }
 ]
 
+[[d1_databases]]
+binding = "DB"
+database_name = "ai-voice-bot-db"
+database_id = "9f95be6d-0023-4360-8baa-2648add6eaf8"
+
+# Optional: deployment-specific portfolio content for Leo's system prompt (key "context").
+# Only the namespace id lives here — the actual content is set via `wrangler kv key put`
+# and never committed, since this repo is shared/forkable.
+[[kv_namespaces]]
+binding = "PORTFOLIO_KV"
+id = "0ac98a2a6f5f428aafa4dd9e1d3f2feb"
+
+# Optional: only required if you want email notifications on new leads.
+# Uncomment after enabling Email Routing for `devmohan.in` and verifying `contact@devmohan.in`.
+# [[send_email]]
+# name = "LEAD_EMAIL"
+# destination_address = "contact@devmohan.in"
+
 [vars]
 ALLOWED_ORIGINS = "https://devmohan.in,https://www.devmohan.in"
 DEFAULT_PROVIDER = "groq"
@@ -25,3 +43,4 @@ class_name = "SessionDO"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["SessionDO"]
+

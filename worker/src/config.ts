@@ -24,7 +24,6 @@ export interface AppConfig {
 export interface Env {
   GROQ_API_KEY?: string;
   GEMINI_API_KEY?: string;
-  WEBHOOK_URL?: string;
   ALLOWED_ORIGINS?: string;
   DEFAULT_PROVIDER?: string;
   MAX_MESSAGE_CHARS?: string;
@@ -34,6 +33,17 @@ export interface Env {
   MAX_TTS_CHARS?: string;
   PERSONA_JSON?: string;
   SESSION_DO: DurableObjectNamespace;
+
+  // v0.3 — leads
+  LEAD_NOTIFY_FROM?: string;
+  LEAD_NOTIFY_TO?: string;
+  DB?: D1Database;
+  LEAD_EMAIL?: { send(msg: { from: string; to: string; subject: string; text: string; html: string }): Promise<{ success: boolean }> };
+  // Optional, deployment-specific: a large formatted text blob of the site owner's full
+  // portfolio data (projects, experience, skills, etc), fetched at request time under the
+  // key "context". A KV namespace (not a secret/var) because secrets cap at 5.1KB and this
+  // repo is shared/forkable — nobody's actual portfolio content belongs committed here.
+  PORTFOLIO_KV?: { get(key: string): Promise<string | null> };
 }
 
 export const defaultPersona: Persona = {

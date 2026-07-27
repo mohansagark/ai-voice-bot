@@ -183,4 +183,15 @@ describe("/chat dev mode (guards bypassed)", () => {
     const dev = await createApp().fetch(new Request("https://w/health"), devEnv);
     expect((await dev.json() as any).mode).toBe("dev");
   });
+
+  it("fetches portfolio context via getPortfolioContext and doesn't fail the turn if it errors", async () => {
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["hi"], { reply: "hi", leadSaved: false, lead: {} });
+    let called = false;
+    const getPortfolioContext = async () => { called = true; throw new Error("KV down"); };
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner, getPortfolioContext });
+    const res = await app.fetch(chatReq({ session_id: "s1", message: "hello" }), env);
+    expect(res.status).toBe(200); // KV failure is non-fatal, same pattern as RAG's old graceful degradation
+    expect(called).toBe(true);
+  });
 });

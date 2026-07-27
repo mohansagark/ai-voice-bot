@@ -3,14 +3,15 @@ import type { ChatStateType } from "./state";
 import type { ChatModelLike } from "../providers";
 import { saveLeadTool, saveLeadSchema } from "./tools";
 import { buildSystemPrompt } from "../prompts";
-import { isValidEmail, postLead, type LeadPayload } from "../leads";
+import { isValidEmail } from "../leads";
+import type { LeadRow } from "../leads-store";
 import type { Persona } from "../config";
 
 export interface AgentDeps {
   model: ChatModelLike;
   persona: Persona;
-  webhookUrl: string;
-  fetchImpl?: typeof fetch;
+  portfolioContext?: string;
+  persistLead: (row: LeadRow) => Promise<void>;
 }
 
 const INJECTION_PATTERNS = [
@@ -40,7 +41,7 @@ export function makeRefuseNode(deps: AgentDeps) {
 }
 
 export function makeAgentNode(deps: AgentDeps) {
-  const system = new SystemMessage(buildSystemPrompt(deps.persona));
+  const system = new SystemMessage(buildSystemPrompt(deps.persona, deps.portfolioContext));
   const bound = deps.model.bindTools([saveLeadTool]);
   return async (state: ChatStateType): Promise<Partial<ChatStateType>> => {
     const extra = state.leadSaved
@@ -64,7 +65,7 @@ export function makeSaveLeadNode(deps: AgentDeps) {
     const last = state.messages[state.messages.length - 1] as AIMessage;
     const call = (last.tool_calls ?? []).find((c) => c.name === "save_lead");
     if (!call) return {};
-    // Already captured this session — acknowledge without re-posting or re-confirming.
+    // Already captured this session — acknowledge without re-saving or re-confirming.
     if (state.leadSaved) {
       return { messages: [new AIMessage("You're all set — I've already passed your details along. What else can I help you with?")] };
     }
@@ -79,20 +80,38 @@ export function makeSaveLeadNode(deps: AgentDeps) {
       };
     }
     const d = parsed.data;
-    const payload: LeadPayload = {
-      name: d.name, email: d.email, message: d.message,
-      phone: d.phone ?? null, company: d.company ?? null,
-      consent: state.consent, meta: {},
+    const row: LeadRow = {
+      email: d.email,
+      name: d.name,
+      question: d.message,
+      sessionId: null,
+      userAgent: null,
+      referer: null,
+      source: "agent",
     };
-    const res = await postLead(deps.webhookUrl, payload, deps.fetchImpl);
-    return {
-      lead: d,
-      leadSaved: true, // recorded; webhook failure will be handled by the KV fallback in v0.2
-      messages: [new ToolMessage({
-        tool_call_id: call.id!,
-        content: res.ok ? "Lead delivered." : "Lead recorded (webhook delivery failed).",
-      })],
-    };
+    try {
+      await deps.persistLead(row);
+      return {
+        lead: d,
+        leadSaved: true,
+        messages: [new ToolMessage({
+          tool_call_id: call.id!,
+          content: "Lead delivered.",
+        })],
+      };
+    } catch (e) {
+      // Lead persistence failed (D1 down). Surface as a tool error so the agent can recover
+      // gracefully — but still mark the lead as recorded so we don't loop forever.
+      return {
+        lead: d,
+        leadSaved: true,
+        messages: [new ToolMessage({
+          tool_call_id: call.id!,
+          content: "Lead recorded (delivery failed).",
+          status: "error",
+        })],
+      };
+    }
   };
 }
 
