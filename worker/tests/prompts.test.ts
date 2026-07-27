@@ -72,4 +72,8 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toMatch(/within your first reply or two/i);
     expect(prompt).toMatch(/separate from.*save_lead/i);
   });
+  it("instructs treating 'email him' requests as save_lead, not drafting a message for the visitor", () => {
+    expect(prompt).toMatch(/not write an email\/message draft/i);
+    expect(prompt).toMatch(/capture their note via save_lead/i);
+  });
 });

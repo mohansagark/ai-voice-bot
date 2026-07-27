@@ -76,6 +76,7 @@ export function makeAgentNode(deps: AgentDeps) {
       return { messages: [reply] };
     } catch (e) {
       if (!fallbackBound) throw e;
+      console.error("primary chat model failed, falling back to OpenRouter:", String((e as Error).message));
       const reply = await withTimeout(fallbackBound.invoke(messages), AGENT_INVOKE_TIMEOUT_MS, "LLM invoke (fallback)");
       return { messages: [reply] };
     }
