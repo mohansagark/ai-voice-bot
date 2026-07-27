@@ -5,8 +5,8 @@ export const saveLeadSchema = z.object({
   name: z.string().describe("The visitor's name"),
   email: z.string().describe("The visitor's email address"),
   message: z.string().describe("What the visitor wants / their message to the owner"),
-  phone: z.string().optional(),
-  company: z.string().optional(),
+  phone: z.string().optional().describe("Optional — only include if the visitor volunteers it. Never ask for it or suggest a placeholder."),
+  company: z.string().optional().describe("Optional — only include if the visitor volunteers it. Never ask for it or suggest a placeholder."),
   preferredTime: z.string().optional().describe(
     "The visitor's stated preferred date/time to connect, if given (e.g. from a '[Preferred time: ...]' marker in their message). Pass it through as-is — never confirm or schedule it.",
   ),

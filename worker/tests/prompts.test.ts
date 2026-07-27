@@ -89,4 +89,12 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toMatch(/NEVER state, invent, or imply a specific date\/time/i);
     expect(prompt).toMatch(/call show_time_picker instead of guessing or making one up/i);
   });
+  it("instructs not overusing the visitor's own name", () => {
+    expect(prompt).toMatch(/same goes for the visitor's own name/i);
+    expect(prompt).toMatch(/not as a "Hey \[Name\]!" opener on every single reply/i);
+  });
+  it("instructs never insisting on optional phone/company fields or suggesting a placeholder", () => {
+    expect(prompt).toMatch(/Phone and company are OPTIONAL on save_lead/i);
+    expect(prompt).toMatch(/never ask for them, insist on them, or suggest a "placeholder" value/i);
+  });
 });
