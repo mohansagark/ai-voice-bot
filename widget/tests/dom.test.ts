@@ -65,14 +65,9 @@ describe("mountShell", () => {
     expect(send.textContent?.trim()).toBe("");
   });
 
-  it("mounts a slot-time picker (toggle, Cally calendar, time input, confirm), hidden by default", () => {
+  it("mounts no manual trigger for the time picker — it's shown only when the agent asks for it", () => {
     const refs = mountShell(cfg);
-    expect(refs.shadow.contains(refs.slotToggle)).toBe(true);
-    expect(refs.shadow.contains(refs.slotPicker)).toBe(true);
-    expect(refs.slotPicker.hasAttribute("hidden")).toBe(true);
-    expect(refs.slotDate.tagName.toLowerCase()).toBe("calendar-date");
-    expect(refs.slotDate.querySelector("calendar-month")).toBeTruthy();
-    expect(refs.slotTime.getAttribute("type")).toBe("time");
-    expect(refs.slotConfirm.disabled).toBe(true);
+    expect(refs.panel.querySelector(".slot")).toBeNull();
+    expect(refs.panel.querySelector(".inline-slotpicker")).toBeNull();
   });
 });

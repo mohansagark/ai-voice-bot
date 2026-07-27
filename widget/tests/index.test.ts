@@ -39,17 +39,38 @@ describe("mount", () => {
     expect(app.refs.list.textContent).toContain("Hey");
   });
 
-  it("slot picker: confirming a time prefills the message input without sending it", () => {
-    const fetchImpl = vi.fn();
-    const app = mount(baseCfg, { store: memoryStore(), fetchImpl: fetchImpl as unknown as typeof fetch })!;
-    app.refs.slotToggle.click();
-    app.refs.slotDate.value = "2026-08-05";
-    app.refs.slotDate.dispatchEvent(new Event("change"));
-    app.refs.slotTime.value = "09:00";
-    app.refs.slotTime.dispatchEvent(new Event("change"));
-    app.refs.slotConfirm.click();
-    expect(app.refs.input.value).toBe("[Preferred time: Wed, Aug 5 — 9:00 AM]");
-    expect(fetchImpl).not.toHaveBeenCalled(); // prefilled only, visitor still has to hit send
+  it("agent-triggered inline time picker: confirming sends immediately, no button involved", async () => {
+    let callCount = 0;
+    const sentMessages: string[] = [];
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      callCount++;
+      sentMessages.push(JSON.parse(String(init?.body)).message);
+      if (callCount === 1) {
+        return streamRes([sse("component", { type: "time_picker" }), sse("done", { reply: "Sure, pick a time!", lead_saved: false })]);
+      }
+      return streamRes([sse("done", { reply: "Got it!", lead_saved: false })]);
+    }) as unknown as typeof fetch;
+    const app = mount(baseCfg, { store: memoryStore(), fetchImpl })!;
+    app.refs.input.value = "I want to schedule a call";
+    app.refs.form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    (app.refs.list.querySelector(".consent button") as HTMLButtonElement).click();
+    await new Promise((r) => setTimeout(r, 50));
+
+    const picker = app.refs.list.querySelector(".inline-slotpicker");
+    expect(picker).toBeTruthy(); // rendered by the agent, no button was clicked to show it
+
+    const dateEl = picker!.querySelector(".slot-date") as HTMLElement & { value: string };
+    const timeEl = picker!.querySelector(".slot-time") as HTMLInputElement;
+    dateEl.value = "2026-08-05";
+    dateEl.dispatchEvent(new Event("change"));
+    timeEl.value = "09:00";
+    timeEl.dispatchEvent(new Event("change"));
+    const wrap = picker!.closest(".msg") as HTMLElement;
+    (picker!.querySelector(".slot-confirm") as HTMLButtonElement).click();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(sentMessages[1]).toBe("[Preferred time: Wed, Aug 5 — 9:00 AM]"); // sent immediately
+    expect(wrap.hidden).toBe(true); // hidden (not removed) once confirmed
   });
 
   it("hitting the permanent per-session turn cap shows a friendly message and disables further input", async () => {
@@ -64,7 +85,6 @@ describe("mount", () => {
     expect(app.refs.list.textContent).not.toContain("hiccuped");
     expect(app.refs.input.disabled).toBe(true);
     expect(app.refs.mic.disabled).toBe(true);
-    expect(app.refs.slotToggle.disabled).toBe(true);
   });
 
   it("greets a returning visitor by stored name", () => {

@@ -5,6 +5,7 @@ export interface ChatEvents {
   onError(message: string): void;
   onBlocked(): void;
   onLimitReached(): void;
+  onComponent(type: string): void;
 }
 
 export function parseSSE(buffer: string): { frames: { event: string; data: string }[]; rest: string } {
@@ -53,6 +54,7 @@ export async function sendChat(
     const payload = JSON.parse(f.data);
     if (f.event === "token") events.onToken(payload.text);
     else if (f.event === "lead") events.onLead(payload.lead);
+    else if (f.event === "component") events.onComponent(payload.type);
     else if (f.event === "done") events.onDone(payload.reply, !!payload.lead_saved);
     else if (f.event === "error") events.onError(payload.message);
   };

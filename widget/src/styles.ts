@@ -75,6 +75,7 @@ export function css(theme: string, theme2: string): string {
   .list { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
   .msg { max-width: 82%; padding: 9px 12px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
   .msg.bot { background: #241f30; align-self: flex-start; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+  .msg.bot:has(.inline-slotpicker) { max-width: 100%; } /* Cally's calendar needs more room than a text bubble */
   .msg.user { background: linear-gradient(120deg, ${theme}, ${theme2}); color: #fff; align-self: flex-end; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
   .msg.note { align-self: center; background: transparent; color: #8a85a0; font-size: 12px; padding: 2px; }
   .msg-text { display: block; }
@@ -88,8 +89,7 @@ export function css(theme: string, theme2: string): string {
   .consent { align-self: stretch; background: #f7f6fb; border: 1px solid #e2dff0; border-radius: 12px; padding: 12px; font-size: 13px; color: #4a4560; }
   .consent a { color: ${theme}; }
   .consent button { margin-top: 8px; background: ${theme}; color: #fff; border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
-  .slotpicker { display: flex; flex-direction: column; gap: 8px; padding: 10px 14px; border-top: 1px solid #2a2638; max-height: 260px; overflow-y: auto; }
-  .slotpicker[hidden] { display: none; }
+  .inline-slotpicker { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
   .slot-date {
     align-self: center; color-scheme: dark; color: #eae7f2; background: #241f30;
     border-radius: 8px; padding: 8px; --color-accent: ${theme}; --color-text-on-accent: #fff;

@@ -15,6 +15,7 @@ function collector() {
     onError: (m) => log.push("error:" + m),
     onBlocked: () => log.push("blocked"),
     onLimitReached: () => log.push("limitReached"),
+    onComponent: (t) => log.push("component:" + t),
   };
   return { log, events };
 }
@@ -49,6 +50,14 @@ describe("sendChat", () => {
     const { log, events } = collector();
     await sendChat("https://w.test", { session_id: "s", message: "hi", consent: {} }, events, fake);
     expect(log).toEqual(["limitReached"]);
+  });
+
+  it("dispatches onComponent for a component frame", async () => {
+    const body = streamOf([sse("component", { type: "time_picker" }), sse("done", { reply: "hi", lead_saved: false })]);
+    const fake = (async () => new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } })) as unknown as typeof fetch;
+    const { log, events } = collector();
+    await sendChat("https://w.test", { session_id: "s", message: "hi", consent: {} }, events, fake);
+    expect(log).toEqual(["component:time_picker", "done:hi:false"]);
   });
 
   it("calls onError on a network failure", async () => {

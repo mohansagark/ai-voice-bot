@@ -1,9 +1,5 @@
-import "cally"; // registers the <calendar-date>/<calendar-month> custom elements
 import type { WidgetConfig } from "./types";
 import { css } from "./styles";
-
-// Cally's <calendar-date> custom element — typed loosely since it's not a built-in HTML element.
-export type CalendarDateEl = HTMLElement & { value: string };
 
 export interface Refs {
   host: HTMLElement; shadow: ShadowRoot;
@@ -11,8 +7,6 @@ export interface Refs {
   list: HTMLElement; form: HTMLFormElement; input: HTMLInputElement;
   mic: HTMLButtonElement; micHalo: HTMLElement; micBars: HTMLElement; waveform: HTMLElement;
   sound: HTMLButtonElement;
-  slotToggle: HTMLButtonElement; slotPicker: HTMLElement; slotDate: CalendarDateEl;
-  slotTime: HTMLInputElement; slotConfirm: HTMLButtonElement;
 }
 
 export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.body): Refs {
@@ -46,19 +40,11 @@ export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.bod
           <span>${escapeHtml(cfg.branding.botName)}</span>
         </div>
         <div class="hd-actions">
-          <button type="button" class="slot" aria-label="Suggest a time to connect" aria-pressed="false">📅</button>
           <button type="button" class="sound" aria-label="Mute ${escapeHtml(cfg.branding.botName)}'s voice" aria-pressed="false">🔊</button>
         </div>
       </div>
     </div>
     <div class="list"></div>
-    <div class="slotpicker" hidden>
-      <calendar-date class="slot-date" aria-label="Preferred date">
-        <calendar-month></calendar-month>
-      </calendar-date>
-      <input type="time" class="slot-time" aria-label="Preferred time" />
-      <button type="button" class="slot-confirm" disabled>Use this time</button>
-    </div>
     <form>
       <button type="button" class="mic" aria-label="Speak your message">
         <span class="mic-icon">🎤</span>
@@ -88,11 +74,6 @@ export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.bod
     micBars: panel.querySelector(".mic-bars")!,
     waveform: panel.querySelector(".waveform")!,
     sound: panel.querySelector(".sound")!,
-    slotToggle: panel.querySelector(".slot")!,
-    slotPicker: panel.querySelector(".slotpicker")!,
-    slotDate: panel.querySelector(".slot-date") as unknown as CalendarDateEl,
-    slotTime: panel.querySelector(".slot-time")!,
-    slotConfirm: panel.querySelector(".slot-confirm")!,
   };
 }
 

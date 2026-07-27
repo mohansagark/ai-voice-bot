@@ -1,4 +1,4 @@
-import type { Refs } from "./dom";
+import "cally"; // registers the <calendar-date>/<calendar-month> custom elements
 
 // dateStr: Cally's <calendar-date> value, "YYYY-MM-DD". timeStr: native <input type="time"> value, "HH:MM" (24h).
 export function formatPreferredTime(dateStr: string, timeStr: string): string {
@@ -11,29 +11,31 @@ export function formatPreferredTime(dateStr: string, timeStr: string): string {
   return `[Preferred time: ${weekday}, ${month} ${d} — ${time}]`;
 }
 
-export function wireSlotPicker(refs: Refs, onConfirm: (formatted: string) => void) {
+// Builds a fresh inline date/time picker — the agent triggers this via a tool call (no
+// header button), so a new instance is created per occurrence rather than a fixed element.
+export function buildInlineTimePicker(onConfirm: (formatted: string) => void): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "inline-slotpicker";
+  wrap.innerHTML = `
+    <calendar-date class="slot-date" aria-label="Preferred date">
+      <calendar-month></calendar-month>
+    </calendar-date>
+    <input type="time" class="slot-time" aria-label="Preferred time" />
+    <button type="button" class="slot-confirm" disabled>Use this time</button>
+  `;
+  const dateEl = wrap.querySelector(".slot-date") as HTMLElement & { value: string };
+  const timeEl = wrap.querySelector(".slot-time") as HTMLInputElement;
+  const confirmBtn = wrap.querySelector(".slot-confirm") as HTMLButtonElement;
+
   const updateConfirmState = () => {
-    refs.slotConfirm.disabled = !(refs.slotDate.value && refs.slotTime.value);
+    confirmBtn.disabled = !(dateEl.value && timeEl.value);
   };
-
-  const closePicker = () => {
-    refs.slotPicker.setAttribute("hidden", "");
-    refs.slotToggle.setAttribute("aria-pressed", "false");
-  };
-
-  refs.slotToggle.addEventListener("click", () => {
-    const isOpen = !refs.slotPicker.hasAttribute("hidden");
-    if (isOpen) { closePicker(); return; }
-    refs.slotPicker.removeAttribute("hidden");
-    refs.slotToggle.setAttribute("aria-pressed", "true");
+  dateEl.addEventListener("change", updateConfirmState);
+  timeEl.addEventListener("change", updateConfirmState);
+  confirmBtn.addEventListener("click", () => {
+    if (!dateEl.value || !timeEl.value) return;
+    onConfirm(formatPreferredTime(dateEl.value, timeEl.value));
   });
 
-  refs.slotDate.addEventListener("change", updateConfirmState);
-  refs.slotTime.addEventListener("change", updateConfirmState);
-
-  refs.slotConfirm.addEventListener("click", () => {
-    if (!refs.slotDate.value || !refs.slotTime.value) return;
-    onConfirm(formatPreferredTime(refs.slotDate.value, refs.slotTime.value));
-    closePicker();
-  });
+  return wrap;
 }

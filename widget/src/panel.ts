@@ -1,5 +1,6 @@
 import type { Refs } from "./dom";
 import type { WidgetConfig } from "./types";
+import { buildInlineTimePicker } from "./slotpicker";
 
 export function shouldPinToBottom(scrollHeight: number, scrollTop: number, clientHeight: number, threshold = 32): boolean {
   return scrollHeight - scrollTop - clientHeight <= threshold;
@@ -45,6 +46,18 @@ export function wirePanel(refs: Refs) {
     note: (text: string) => void line("note", text),
     showError: () => void line("bot", "Hmm, something hiccuped — mind trying that again?"),
     showLimitReached: () => void line("bot", "We've covered a lot today — I need to recharge! Thanks so much for stopping by, and come back again soon."),
+    showTimePicker: (onConfirm: (formatted: string) => void) => {
+      const pin = isPinned();
+      const wrap = document.createElement("div");
+      wrap.className = "msg bot msg-enter";
+      // Hide, don't remove: disconnecting a Cally custom element from the DOM has been
+      // observed to hang under some test/runtime environments (its custom-element teardown
+      // lifecycle) — hiding sidesteps that entirely and is visually equivalent.
+      const picker = buildInlineTimePicker((formatted) => { wrap.hidden = true; onConfirm(formatted); });
+      wrap.appendChild(picker);
+      refs.list.appendChild(wrap);
+      if (pin) scrollToBottom();
+    },
     onSubmit: (handler: (text: string) => void) => {
       refs.form.addEventListener("submit", (e) => {
         e.preventDefault();
