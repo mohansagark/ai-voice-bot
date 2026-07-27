@@ -7,15 +7,41 @@ import { DEFAULTS } from "../src/config";
 const cfg = { workerUrl: "https://w.test", ...DEFAULTS } as any;
 
 describe("wireOrb", () => {
-  it("toggles the panel open on orb click and closed on close button", () => {
+  it("toggles the panel open on orb click and closed on header click", () => {
     const refs = mountShell(cfg);
     const orb = wireOrb(refs);
     expect(orb.isOpen()).toBe(false);
     refs.orb.click();
     expect(refs.panel.getAttribute("data-open")).toBe("true");
     expect(orb.isOpen()).toBe(true);
-    (refs.panel.querySelector(".close") as HTMLButtonElement).click();
+    refs.header.click();
     expect(refs.panel.getAttribute("data-open")).toBe("false");
+  });
+
+  it("does not close when the header click actually landed on the sound toggle", () => {
+    const refs = mountShell(cfg);
+    const orb = wireOrb(refs);
+    refs.orb.click();
+    expect(orb.isOpen()).toBe(true);
+    (refs.panel.querySelector(".sound") as HTMLButtonElement).click();
+    expect(orb.isOpen()).toBe(true); // still open — sound toggle isn't a close gesture
+  });
+
+  it("closes when a click lands outside the widget host entirely", () => {
+    const refs = mountShell(cfg);
+    const orb = wireOrb(refs);
+    refs.orb.click();
+    expect(orb.isOpen()).toBe(true);
+    document.body.click();
+    expect(orb.isOpen()).toBe(false);
+  });
+
+  it("does not close on outside clicks while already closed (no-op)", () => {
+    const refs = mountShell(cfg);
+    const orb = wireOrb(refs);
+    expect(orb.isOpen()).toBe(false);
+    document.body.click();
+    expect(orb.isOpen()).toBe(false);
   });
 
   it("open({ focus: false }) opens the panel without focusing the input; open() with no args still focuses it", () => {

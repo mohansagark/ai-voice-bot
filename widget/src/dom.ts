@@ -41,7 +41,6 @@ export function mountShell(cfg: WidgetConfig, parent: HTMLElement = document.bod
         </div>
         <div class="hd-actions">
           <button type="button" class="sound" aria-label="Mute ${escapeHtml(cfg.branding.botName)}'s voice" aria-pressed="false">🔊</button>
-          <button class="close" aria-label="Close">×</button>
         </div>
       </div>
     </div>
