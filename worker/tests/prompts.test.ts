@@ -97,6 +97,10 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toMatch(/Phone and company are OPTIONAL on save_lead/i);
     expect(prompt).toMatch(/never ask for them, insist on them, or suggest a "placeholder" value/i);
   });
+  it("instructs not looping on a categorization question for what the visitor wants", () => {
+    expect(prompt).toMatch(/Don't ask the visitor to categorize what they want/i);
+    expect(prompt).toMatch(/accept whatever you get.*as their save_lead message/i);
+  });
   it("instructs not fully solving the visitor's stated need instead of capturing it as their message", () => {
     expect(prompt).toMatch(/don't fully solve or advise on it yourself/i);
     expect(prompt).toMatch(/keep moving toward save_lead/i);
