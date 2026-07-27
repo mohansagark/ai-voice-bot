@@ -14,6 +14,7 @@ function collector() {
     onDone: (r, s) => log.push("done:" + r + ":" + s),
     onError: (m) => log.push("error:" + m),
     onBlocked: () => log.push("blocked"),
+    onLimitReached: () => log.push("limitReached"),
   };
   return { log, events };
 }
@@ -41,6 +42,13 @@ describe("sendChat", () => {
     const { log, events } = collector();
     await sendChat("https://w.test", { session_id: "s", message: "hi", consent: {} }, events, fake);
     expect(log).toEqual(["blocked"]);
+  });
+
+  it("calls onLimitReached for a 429 {limitReached:true} without streaming", async () => {
+    const fake = (async () => Response.json({ error: "too many turns", limitReached: true }, { status: 429 })) as unknown as typeof fetch;
+    const { log, events } = collector();
+    await sendChat("https://w.test", { session_id: "s", message: "hi", consent: {} }, events, fake);
+    expect(log).toEqual(["limitReached"]);
   });
 
   it("calls onError on a network failure", async () => {

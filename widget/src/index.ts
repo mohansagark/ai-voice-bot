@@ -213,6 +213,19 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
             awaitingReply = false;
             if (conversationMode) startListening();
           },
+          onLimitReached: () => {
+            line.remove(); panel.showLimitReached(); orb.setThinking(false); emit(analytics, "limit_reached");
+            awaitingReply = false;
+            if (conversationMode) stopConversationMode();
+            // Every further attempt this session would fail identically (the cap is
+            // permanent, not transient) — disable input instead of inviting more dead-end tries.
+            refs.input.disabled = true;
+            refs.input.placeholder = "Chat limit reached for today";
+            refs.mic.disabled = true;
+            refs.slotToggle.disabled = true;
+            const send = refs.form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+            if (send) send.disabled = true;
+          },
         },
         fetchImpl,
       );

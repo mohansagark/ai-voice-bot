@@ -44,6 +44,7 @@ export function wirePanel(refs: Refs) {
     },
     note: (text: string) => void line("note", text),
     showError: () => void line("bot", "Hmm, something hiccuped — mind trying that again?"),
+    showLimitReached: () => void line("bot", "We've covered a lot today — I need to recharge! Thanks so much for stopping by, and come back again soon."),
     onSubmit: (handler: (text: string) => void) => {
       refs.form.addEventListener("submit", (e) => {
         e.preventDefault();

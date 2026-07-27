@@ -52,6 +52,21 @@ describe("mount", () => {
     expect(fetchImpl).not.toHaveBeenCalled(); // prefilled only, visitor still has to hit send
   });
 
+  it("hitting the permanent per-session turn cap shows a friendly message and disables further input", async () => {
+    const store = memoryStore();
+    store.set("avb_consent", JSON.stringify({ agreed: true, timestamp: "2026-01-01", text: "x" }));
+    const fetchImpl = (async () => Response.json({ error: "too many turns", limitReached: true }, { status: 429 })) as unknown as typeof fetch;
+    const app = mount(baseCfg, { store, fetchImpl })!;
+    app.refs.input.value = "one more thing";
+    app.refs.form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(app.refs.list.textContent).toContain("come back again soon");
+    expect(app.refs.list.textContent).not.toContain("hiccuped");
+    expect(app.refs.input.disabled).toBe(true);
+    expect(app.refs.mic.disabled).toBe(true);
+    expect(app.refs.slotToggle.disabled).toBe(true);
+  });
+
   it("greets a returning visitor by stored name", () => {
     const store = memoryStore(); store.set("avb_name", "Alex");
     const app = mount(baseCfg, { store, fetchImpl: fetch })!;

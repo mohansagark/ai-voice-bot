@@ -4,6 +4,7 @@ export interface ChatEvents {
   onDone(reply: string, leadSaved: boolean): void;
   onError(message: string): void;
   onBlocked(): void;
+  onLimitReached(): void;
 }
 
 export function parseSSE(buffer: string): { frames: { event: string; data: string }[]; rest: string } {
@@ -37,8 +38,9 @@ export async function sendChat(
   }
 
   if (res.status === 429) {
-    const info = (await res.json().catch(() => ({}))) as { blocked?: boolean };
+    const info = (await res.json().catch(() => ({}))) as { blocked?: boolean; limitReached?: boolean };
     if (info?.blocked) events.onBlocked();
+    else if (info?.limitReached) events.onLimitReached();
     else events.onError("rate limited");
     return;
   }
