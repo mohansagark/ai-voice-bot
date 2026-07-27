@@ -65,13 +65,23 @@ export function makeSaveLeadNode(deps: AgentDeps) {
     const last = state.messages[state.messages.length - 1] as AIMessage;
     const call = (last.tool_calls ?? []).find((c) => c.name === "save_lead");
     if (!call) return {};
-    // Already captured this session — acknowledge without re-saving or re-confirming.
+    // Already captured this session — the model isn't supposed to call save_lead again,
+    // but it doesn't always comply. Rather than short-circuit the turn with a canned
+    // reply (which used to swallow whatever the visitor actually just asked), report it
+    // as a no-op tool result and let the agent give a real answer to their message.
     if (state.leadSaved) {
-      return { messages: [new AIMessage("You're all set — I've already passed your details along. What else can I help you with?")] };
+      return {
+        leadJustSaved: false,
+        messages: [new ToolMessage({
+          tool_call_id: call.id!,
+          content: "Already recorded this visitor this session — do not save again. Just answer what they actually asked.",
+        })],
+      };
     }
     const parsed = saveLeadSchema.safeParse(call.args);
     if (!parsed.success || !isValidEmail(parsed.data.email)) {
       return {
+        leadJustSaved: false,
         messages: [new ToolMessage({
           tool_call_id: call.id!,
           content: "The email is invalid or a required field is missing. Ask the visitor to confirm their email before trying again.",
@@ -94,6 +104,7 @@ export function makeSaveLeadNode(deps: AgentDeps) {
       return {
         lead: d,
         leadSaved: true,
+        leadJustSaved: true,
         messages: [new ToolMessage({
           tool_call_id: call.id!,
           content: "Lead delivered.",
@@ -101,10 +112,13 @@ export function makeSaveLeadNode(deps: AgentDeps) {
       };
     } catch (e) {
       // Lead persistence failed (D1 down). Surface as a tool error so the agent can recover
-      // gracefully — but still mark the lead as recorded so we don't loop forever.
+      // gracefully — but still mark the lead as recorded so we don't loop forever. Routes
+      // back to "agent" (not "confirm"), since celebrating a save that didn't actually
+      // happen would be worse than the agent handling the error naturally.
       return {
         lead: d,
         leadSaved: true,
+        leadJustSaved: false,
         messages: [new ToolMessage({
           tool_call_id: call.id!,
           content: "Lead recorded (delivery failed).",
@@ -115,11 +129,12 @@ export function makeSaveLeadNode(deps: AgentDeps) {
   };
 }
 
-export function routeAfterSaveLead(state: ChatStateType): "confirm" | "agent" | "end" {
-  const last = state.messages[state.messages.length - 1];
-  // If save_lead ran but the last message is a plain AI line (already-recorded ack), end.
-  if (last?._getType?.() === "ai") return "end";
-  return state.leadSaved ? "confirm" : "agent";
+export function routeAfterSaveLead(state: ChatStateType): "confirm" | "agent" {
+  // Only a fresh, successful save goes to the celebratory confirm line. Every other
+  // outcome (already saved earlier, invalid email, persist failure) routes back to the
+  // agent so it can give a real reply grounded in the tool result and whatever the
+  // visitor actually asked.
+  return state.leadJustSaved ? "confirm" : "agent";
 }
 
 export function makeConfirmNode(deps: AgentDeps) {

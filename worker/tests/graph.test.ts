@@ -95,23 +95,32 @@ describe("graph", () => {
     expect(String(out.messages.at(-1)?.content)).toContain(defaultPersona.owner.name); // owner name from persona, not hardcoded
   });
 
-  it("does not re-save when a lead was already saved this session", async () => {
+  it("does not re-save when a lead was already saved this session, and still answers the actual question", async () => {
+    // The model violates the "don't call save_lead again" instruction (it doesn't always
+    // comply) — regression test for a bug where this used to swallow the real question
+    // behind a hardcoded "You're all set" line, regardless of what was actually asked.
     const toolCall = new AIMessage({ content: "", tool_calls: [{ name: "save_lead", id: "c1", args: { name: "Jane", email: "jane@x.com", message: "again" } }] });
-    const { deps: d, calls } = deps([toolCall]);
+    const realAnswer = new AIMessage("Mohan's usually free for a quick call — I'll flag your interest to him directly.");
+    const { deps: d, calls } = deps([toolCall, realAnswer]);
     const g = buildGraph(d);
-    const out = await g.invoke({ messages: [new HumanMessage("save me again")], leadSaved: true, lead: { email: "jane@x.com" } } as any);
-    expect(calls.length).toBe(0);          // persistLead NOT called again
+    const out = await g.invoke(
+      { messages: [new HumanMessage("need to know Mohan's availability for a connect")], leadSaved: true, lead: { email: "jane@x.com" } } as any,
+    );
+    expect(calls.length).toBe(0); // persistLead NOT called again
     expect(out.leadSaved).toBe(true);
+    expect(String(out.messages.at(-1)?.content)).toBe(realAnswer.content); // answers the real question, not a canned line
   });
 
-  it("still returns a confirm message when persistLead throws (D1/email outage)", async () => {
+  it("does not show the celebratory confirm message when persistLead throws (D1/email outage)", async () => {
     const toolCall = new AIMessage({ content: "", tool_calls: [{ name: "save_lead", id: "c1", args: { name: "Jane", email: "jane@x.com", message: "hi" } }] });
-    const { deps: d } = deps([toolCall], async () => { throw new Error("d1 down"); });
+    const recovery = new AIMessage("Got your details, but hit a snag saving them — Mohan will still see this though.");
+    const { deps: d } = deps([toolCall, recovery], async () => { throw new Error("d1 down"); });
     const g = buildGraph(d);
     const out = await g.invoke({ messages: [new HumanMessage("save me")] });
-    // The lead node converts the throw into a ToolMessage error → routes back to agent, which
-    // (in this scripted test) re-asks. Either way, no unhandled exception escapes.
-    expect(out).toBeDefined();
+    // Routes back to "agent" (not "confirm") on a failed persist — celebrating a save that
+    // didn't actually happen would be worse than letting the agent react to the error.
+    expect(String(out.messages.at(-1)?.content)).not.toContain("Amazing — got it");
+    expect(String(out.messages.at(-1)?.content)).toBe(recovery.content);
   });
 
   it("threads portfolioContext into the agent's system message when provided", async () => {

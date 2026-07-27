@@ -12,6 +12,10 @@ export const ChatState = Annotation.Root({
   consent: Annotation<Consent>({ reducer: (_, y) => y, default: () => ({ agreed: false }) }),
   offTopicStrikes: Annotation<number>({ reducer: (_, y) => y, default: () => 0 }),
   leadSaved: Annotation<boolean>({ reducer: (_, y) => y, default: () => false }),
+  // True only on the turn a lead is freshly persisted — distinct from leadSaved (which
+  // stays true for the rest of the session) so routing can tell "just saved, go
+  // celebrate" apart from "already saved earlier, this was a no-op re-attempt."
+  leadJustSaved: Annotation<boolean>({ reducer: (_, y) => y, default: () => false }),
 });
 
 export type ChatStateType = typeof ChatState.State;
