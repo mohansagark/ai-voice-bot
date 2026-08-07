@@ -411,7 +411,7 @@ describe("mount", () => {
     }
   });
 
-  it("first-time visitor: auto-opens the panel and speaks the greeting after a delay, regardless of the mute default", async () => {
+  it("first-time visitor: auto-opens the panel with the text greeting, but does NOT speak while muted by default", async () => {
     vi.useFakeTimers();
     try {
       const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
@@ -428,9 +428,35 @@ describe("mount", () => {
       expect(app.refs.panel.getAttribute("data-open")).toBe("false"); // not yet — delay hasn't elapsed
       await vi.advanceTimersByTimeAsync(1800);
       expect(app.refs.panel.getAttribute("data-open")).toBe("true");
-      expect(app.refs.list.textContent).toContain("Hi there!"); // baseCfg's greeting text
-      await vi.advanceTimersByTimeAsync(0); // let the queued speak()'s fetch/play chain settle
-      expect(audio.played).toBe(true); // spoke despite speakByDefault:false/soundOn default being off
+      expect(app.refs.list.textContent).toContain("Hi there!"); // baseCfg's greeting text, chat still works
+      await vi.advanceTimersByTimeAsync(0); // let any queued speak()'s fetch/play chain settle
+      expect(audio.played).toBe(false); // must stay silent: speakByDefault:false, visitor never opted in
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("first-time visitor, still muted: a page click before the proactive delay elapses does not turn audio on either", async () => {
+    vi.useFakeTimers();
+    try {
+      const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
+      const fetchImpl = (async (url: string) => {
+        if (String(url).endsWith("/tts")) return new Response("audio", { status: 200 });
+        throw new Error("chat should not be called by the proactive greeting");
+      }) as unknown as typeof fetch;
+      let interactionHandler: (() => void) | null = null;
+      const app = mount(baseCfg, {
+        store: memoryStore(),
+        fetchImpl,
+        makeAudio: () => audio,
+        userActivation: { hasBeenActive: false },
+        interactionAddEventListener: (_type, cb) => { interactionHandler = cb; },
+      } as any)!;
+      await vi.advanceTimersByTimeAsync(1800);
+      expect(app.refs.panel.getAttribute("data-open")).toBe("true"); // text greeting still proactive
+      interactionHandler?.(); // visitor's first click/keydown/touch anywhere on the page
+      await vi.advanceTimersByTimeAsync(0);
+      expect(audio.played).toBe(false); // a bare page interaction must never be treated as opting in
     } finally {
       vi.useRealTimers();
     }
@@ -460,9 +486,10 @@ describe("mount", () => {
     }
   });
 
-  it("returning visitor: does not auto-open (avb_visited already set), but still proactively speaks", async () => {
+  it("returning visitor with sound on: does not auto-open (avb_visited already set), but still proactively speaks", async () => {
     vi.useFakeTimers();
     try {
+      const cfg = { ...baseCfg, voice: { enabled: true, ttsVoice: "hannah", speakByDefault: true } };
       const store = memoryStore();
       store.set("avb_visited", "1");
       const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
@@ -470,7 +497,7 @@ describe("mount", () => {
         if (String(url).endsWith("/tts")) return new Response("audio", { status: 200 });
         throw new Error("chat should not be called by the proactive greeting");
       }) as unknown as typeof fetch;
-      const app = mount(baseCfg, { store, fetchImpl, makeAudio: () => audio, userActivation: { hasBeenActive: true } } as any)!;
+      const app = mount(cfg, { store, fetchImpl, makeAudio: () => audio, userActivation: { hasBeenActive: true } } as any)!;
       await vi.advanceTimersByTimeAsync(5000); // well past the 1800ms delay
       expect(app.refs.panel.getAttribute("data-open")).toBe("false"); // panel-open is still a one-time-ever thing
       expect(audio.played).toBe(true); // but the voice greeting plays on this visit too
@@ -479,9 +506,10 @@ describe("mount", () => {
     }
   });
 
-  it("speaks a greeting on every visit, not just the first-ever one (mounting twice against the same persisted store)", async () => {
+  it("with sound on: speaks a greeting on every visit, not just the first-ever one (mounting twice against the same persisted store)", async () => {
     vi.useFakeTimers();
     try {
+      const cfg = { ...baseCfg, voice: { enabled: true, ttsVoice: "hannah", speakByDefault: true } };
       const store = memoryStore();
       const speakCalls: string[] = [];
       const audio = { played: false, onended: null as (() => void) | null, onerror: null as (() => void) | null, play: async () => { audio.played = true; }, pause: () => {} };
@@ -491,14 +519,14 @@ describe("mount", () => {
       }) as unknown as typeof fetch;
 
       // First visit: fresh store — panel opens, generic greeting spoken.
-      const app1 = mount(baseCfg, { store, fetchImpl, makeAudio: () => audio, userActivation: { hasBeenActive: true } } as any)!;
+      const app1 = mount(cfg, { store, fetchImpl, makeAudio: () => audio, userActivation: { hasBeenActive: true } } as any)!;
       await vi.advanceTimersByTimeAsync(1800);
       expect(app1.refs.panel.getAttribute("data-open")).toBe("true");
       expect(speakCalls.length).toBe(1);
       expect(speakCalls[0]).toContain("Hi there!");
 
       // Second visit against the same store (avb_visited now set): panel stays closed, but it speaks again.
-      const app2 = mount(baseCfg, { store, fetchImpl, makeAudio: () => audio, userActivation: { hasBeenActive: true } } as any)!;
+      const app2 = mount(cfg, { store, fetchImpl, makeAudio: () => audio, userActivation: { hasBeenActive: true } } as any)!;
       await vi.advanceTimersByTimeAsync(1800);
       expect(app2.refs.panel.getAttribute("data-open")).toBe("false");
       expect(speakCalls.length).toBe(2);
@@ -508,9 +536,10 @@ describe("mount", () => {
     }
   });
 
-  it("pre-existing visitor with a stored name (migration case): speaks 'Welcome back' without auto-opening the panel", async () => {
+  it("with sound on: pre-existing visitor with a stored name (migration case) speaks 'Welcome back' without auto-opening the panel", async () => {
     vi.useFakeTimers();
     try {
+      const cfg = { ...baseCfg, voice: { enabled: true, ttsVoice: "hannah", speakByDefault: true } };
       const store = memoryStore();
       store.set("avb_name", "Mohan"); // existing visitor from before this feature shipped — has a name, but avb_visited was never set
       let ttsBody: string | null = null;
@@ -519,7 +548,7 @@ describe("mount", () => {
         if (String(url).endsWith("/tts")) { ttsBody = String(init?.body); return new Response("audio", { status: 200 }); }
         throw new Error("chat should not be called by the proactive greeting");
       }) as unknown as typeof fetch;
-      const app = mount(baseCfg, {
+      const app = mount(cfg, {
         store,
         fetchImpl,
         makeAudio: () => audio,
@@ -535,9 +564,10 @@ describe("mount", () => {
     }
   });
 
-  it("returning visitor without a stored name (consented/chatted before, but never gave a name): speaks 'Welcome back!' with no name, without auto-opening the panel", async () => {
+  it("with sound on: returning visitor without a stored name (consented/chatted before, but never gave a name) speaks 'Welcome back!' with no name, without auto-opening the panel", async () => {
     vi.useFakeTimers();
     try {
+      const cfg = { ...baseCfg, voice: { enabled: true, ttsVoice: "hannah", speakByDefault: true } };
       const store = memoryStore();
       // Has chatted before (consent was recorded), but never gave a name — distinct from a brand-new visitor.
       store.set("avb_consent", JSON.stringify({ agreed: true, timestamp: new Date().toISOString(), text: "ok" }));
@@ -547,7 +577,7 @@ describe("mount", () => {
         if (String(url).endsWith("/tts")) { ttsBody = String(init?.body); return new Response("audio", { status: 200 }); }
         throw new Error("chat should not be called by the proactive greeting");
       }) as unknown as typeof fetch;
-      const app = mount(baseCfg, {
+      const app = mount(cfg, {
         store,
         fetchImpl,
         makeAudio: () => audio,

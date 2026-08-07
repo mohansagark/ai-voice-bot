@@ -107,14 +107,18 @@ export function mount(rawConfig: unknown, deps: MountDeps = {}): { refs: Refs } 
     });
     if (cfg.behavior.autoGreet && cfg.behavior.proactiveGreet) {
       // The panel auto-opens at most once, ever, on a visitor's true first encounter with the
-      // site — but the proactive spoken greeting happens on every visit, first or returning.
+      // site. The proactive greeting is TEXT-always (every visit, first or returning) but only
+      // SPOKEN when the visitor has sound on (speakByDefault, or they unmuted before this fires)
+      // — a first page interaction must never be the thing that turns audio on for them.
       const isFirstEverVisit = !session.hasVisitedBefore();
       session.markVisited();
       const knownName = cfg.behavior.rememberReturning ? session.name() : null;
       setTimeout(() => {
         if (isFirstEverVisit && !knownName && !isReturningVisitor) orb.open({ focus: false });
         if (cfg.voice.enabled && speaker) {
-          speakGreetingOnInteraction(() => speakGreetingOnce(greetingTextFor(knownName)), {
+          speakGreetingOnInteraction(() => {
+            if (soundOn) speakGreetingOnce(greetingTextFor(knownName));
+          }, {
             userActivation: deps.userActivation,
             addEventListener: deps.interactionAddEventListener,
           });
