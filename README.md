@@ -36,36 +36,93 @@ ai-voice-bot is the opposite path: a **Cloudflare Worker you deploy**, a **KV sy
 
 ## Quick start
 
+Get the bot on your site in four steps. You need a free [Cloudflare](https://dash.cloudflare.com) account and a free [Groq](https://console.groq.com) API key.
+
+### 1. Deploy the backend (once)
+
 ```bash
-# 1. Clone + install Worker
 git clone https://github.com/mohansagark/ai-voice-bot.git
 cd ai-voice-bot/worker
 npm install
 npx wrangler login
 
-# 2. Create bindings (paste IDs into wrangler.toml)
 npx wrangler d1 create ai-voice-bot-db
 npx wrangler kv namespace create PORTFOLIO_KV
+# paste the two IDs into wrangler.toml (replace the sample values)
 
-# 3. Deploy → secrets → sync config → embed
 npx wrangler deploy
 npx wrangler secret put GROQ_API_KEY
+```
+
+Save the Worker URL wrangler prints (something like `https://ai-voice-bot.your-name.workers.dev`).  
+Your Groq key lives in Cloudflare — the Worker uses it automatically after this. You never put it on your website.
+
+<details>
+<summary>Optional extras</summary>
+
+- For neural voice: accept [Orpheus terms](https://console.groq.com/playground?model=canopylabs%2Forpheus-v1-english) in Groq once.
+- Lead email/webhook: `wrangler secret put` for `WEBHOOK_URL` or `RESEND_API_KEY` / `LEAD_NOTIFY_FROM` / `LEAD_NOTIFY_TO`.
+- Full `wrangler.toml` reference: [Config sync](#config-sync).
+
+</details>
+
+### 2. Tell the bot who you are
+
+```bash
 cd ..
 cp config/site-config.template.json ./mysite-config.json
 cp config/context.template.txt ./mysite-context.txt
-# edit both, then:
-node scripts/sync-config.mjs --config ./mysite-config.json --context ./mysite-context.txt
 ```
 
-Confirm sync, then embed the widget with your Worker URL:
+Edit those two files:
+
+| File | Fill in |
+|------|---------|
+| `mysite-config.json` | Your site URL(s) under `allowedOrigins` (e.g. `https://yoursite.com`), your name/role, bot name, greeting, and a few facts |
+| `mysite-context.txt` | Plain-text resume: projects, jobs, skills — whatever visitors should be able to ask about |
+
+`allowedOrigins` must match your live site exactly (`https://…` only — no `/` at the end).
+
+Then push both to Cloudflare:
 
 ```bash
-curl -s https://YOUR_WORKER_URL/health
-# healthy: "config":"kv", "origins": > 0
+node scripts/sync-config.mjs \
+  --config ./mysite-config.json \
+  --context ./mysite-context.txt
 ```
 
-> **First-deploy order:** Worker → secrets → KV sync → health check.  
-> Until `app_config` is synced, production **fails closed** (`403` on browser chat).
+Change your bio or projects later? Edit the files and run the same command again — no redeploy.
+
+### 3. Add two tags to your site
+
+Paste this before `</body>` (or load it from your app). Replace the Worker URL and greeting:
+
+```html
+<script>
+  window.AiVoiceBotConfig = {
+    workerUrl: "https://YOUR_WORKER_URL",
+    branding: {
+      botName: "Leo",
+      greeting: "Hi! Ask me about their work or how to get in touch."
+    },
+    voice: { enabled: true, speakByDefault: false }
+  };
+</script>
+<script
+  src="https://cdn.jsdelivr.net/npm/ai-voice-bot-widget@0.1.0/dist/ai-voice-bot.min.js"
+  defer
+></script>
+```
+
+That’s the plug-and-play part: public URL + name + greeting. No API keys on the page.
+
+### 4. Check it works
+
+1. Open `https://YOUR_WORKER_URL/health` — you want `"config":"kv"` and `"origins"` greater than `0`.
+2. Open your site — the chat bubble should appear.
+3. Send a message about a project from your context file.
+
+Stuck? See [Troubleshooting](#troubleshooting). React / Next.js notes: [`widget/README.md`](widget/README.md).
 
 ---
 
@@ -124,28 +181,9 @@ Cloudflare Worker (yours)
 
 ---
 
-## Embed
+## Embed (reference)
 
-Public config only — **never** API keys:
-
-```html
-<script>
-  window.AiVoiceBotConfig = {
-    workerUrl: "https://YOUR_WORKER_URL",
-    branding: {
-      botName: "Leo",
-      greeting: "Hi, I'm Leo — how can I help?"
-    },
-    voice: { enabled: true, speakByDefault: false }
-  };
-</script>
-<script
-  src="https://cdn.jsdelivr.net/npm/ai-voice-bot-widget@0.1.0/dist/ai-voice-bot.min.js"
-  defer
-></script>
-```
-
-Or build from source:
+Script tags live in [Quick start §3](#3-add-two-tags-to-your-site). Build from source if you prefer not to use the CDN:
 
 ```bash
 cd widget && npm install && npm run build
@@ -154,7 +192,7 @@ cd widget && npm install && npm run build
 
 | Host | How |
 |------|-----|
-| Plain HTML | Script tags above |
+| Plain HTML | Two tags from Quick start §3 |
 | Next.js / React | Public env for `workerUrl` + client loader — see [`widget/README.md`](widget/README.md) |
 | CMS-driven sites | Build `mysite-config.json` from your CMS; sync on production deploy |
 
@@ -162,7 +200,7 @@ cd widget && npm install && npm run build
 
 ## Config sync
 
-Update persona / knowledge **without redeploying** the Worker:
+Re-sync after persona / knowledge edits (**no Worker redeploy**):
 
 ```bash
 node scripts/sync-config.mjs \
