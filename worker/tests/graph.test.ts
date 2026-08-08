@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { saveLeadSchema, saveLeadTool } from "../src/agent/tools";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { buildGraph } from "../src/agent/graph";
-import { AGENT_INVOKE_TIMEOUT_MS } from "../src/agent/nodes";
+import { AGENT_INVOKE_TIMEOUT_MS, wantsTimePicker } from "../src/agent/nodes";
 import type { ChatModelLike } from "../src/providers";
 import { defaultPersona } from "../src/config";
 import type { LeadRow } from "../src/leads-store";
@@ -186,24 +186,51 @@ describe("graph", () => {
   });
 });
 
+describe("wantsTimePicker", () => {
+  it("detects schedule / meeting intent", () => {
+    expect(wantsTimePicker("can you schedule a session with mohan")).toBe(true);
+    expect(wantsTimePicker("I need to book a meeting")).toBe(true);
+    expect(wantsTimePicker("what times work for a call?")).toBe(false);
+    expect(wantsTimePicker("hi there")).toBe(false);
+  });
+  it("skips when a preferred time marker is already present", () => {
+    expect(wantsTimePicker("[Preferred time: Sun, Aug 10 at 2:00 PM]")).toBe(false);
+  });
+});
+
 describe("show_time_picker tool", () => {
-  it("sets uiComponent and ends with an ack (no second LLM round-trip)", async () => {
+  it("fast-paths schedule intent without calling the LLM", async () => {
+    const { deps: d, model } = deps([new AIMessage("should not be used")]);
+    const g = buildGraph(d);
+    const out = await g.invoke({
+      messages: [new HumanMessage("can you schedule a session with mohan to discuss work")],
+    });
+    expect(out.uiComponent).toBe("time_picker");
+    expect(String(out.messages.at(-1)?.content)).toMatch(/pick a time/i);
+    expect(model.invocations).toHaveLength(0);
+  });
+
+  it("sets uiComponent and ends with an ack when the model calls the tool (non-schedule phrasing)", async () => {
+    // Human text must NOT match wantsTimePicker, so we exercise the LLM tool path.
     const toolCall = new AIMessage({
       content: "Sure — pick whatever works for you below!",
-      tool_calls: [{ name: "show_time_picker", id: "c1", args: {} }],
+      tool_calls: [{ name: "show_time_picker", id: "c1", args: { reason: "follow-up" } }],
     });
     const { deps: d } = deps([toolCall]);
     const g = buildGraph(d);
-    const out = await g.invoke({ messages: [new HumanMessage("I want to set up a call")] });
+    const out = await g.invoke({ messages: [new HumanMessage("when are you free next week?")] });
     expect(out.uiComponent).toBe("time_picker");
     expect(String(out.messages.at(-1)?.content)).toBe("Sure — pick whatever works for you below!");
   });
 
   it("uses a canned ack when the tool call has no prose content", async () => {
-    const toolCall = new AIMessage({ content: "", tool_calls: [{ name: "show_time_picker", id: "c1", args: {} }] });
+    const toolCall = new AIMessage({
+      content: "",
+      tool_calls: [{ name: "show_time_picker", id: "c1", args: { reason: "follow-up" } }],
+    });
     const { deps: d } = deps([toolCall]);
     const g = buildGraph(d);
-    const out = await g.invoke({ messages: [new HumanMessage("I want to set up a call")] });
+    const out = await g.invoke({ messages: [new HumanMessage("when are you free next week?")] });
     expect(out.uiComponent).toBe("time_picker");
     expect(String(out.messages.at(-1)?.content)).toMatch(/pick a time/i);
     expect(String(out.messages.at(-1)?.content)).toContain(defaultPersona.owner.name);
@@ -212,7 +239,7 @@ describe("show_time_picker tool", () => {
   it("does not set uiComponent when the agent replies without calling the tool", async () => {
     const { deps: d } = deps([new AIMessage("Sure, what works for you?")]);
     const g = buildGraph(d);
-    const out = await g.invoke({ messages: [new HumanMessage("I want to set up a call")] });
+    const out = await g.invoke({ messages: [new HumanMessage("tell me about his projects")] });
     expect(out.uiComponent).toBe(null);
   });
 });

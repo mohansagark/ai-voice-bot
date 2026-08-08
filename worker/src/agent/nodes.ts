@@ -60,11 +60,46 @@ export function makeRefuseNode(deps: AgentDeps) {
   });
 }
 
+/** True when the visitor is asking to schedule / pick a time (and hasn't already picked one). */
+export function wantsTimePicker(text: string): boolean {
+  if (!text || /\[Preferred time:/i.test(text)) return false;
+  return /\b(schedule|book|booking|meeting|appointment|time picker|pick a time|set up a (call|meeting|session)|sync with|connect with)\b/i.test(
+    text,
+  );
+}
+
+function lastHumanText(state: ChatStateType): string {
+  for (let i = state.messages.length - 1; i >= 0; i--) {
+    const m = state.messages[i] as { _getType?: () => string; getType?: () => string; content?: unknown };
+    const kind = m._getType?.() ?? m.getType?.();
+    if (kind === "human" && typeof m.content === "string") return m.content;
+  }
+  return "";
+}
+
 export function makeAgentNode(deps: AgentDeps) {
   const system = new SystemMessage(buildSystemPrompt(deps.persona, deps.portfolioContext));
   const bound = deps.model.bindTools([saveLeadTool, showTimePickerTool]);
   const fallbackBound = deps.fallbackModel?.bindTools([saveLeadTool, showTimePickerTool]);
   return async (state: ChatStateType): Promise<Partial<ChatStateType>> => {
+    // Fast path: schedule intent → synthetic show_time_picker (no LLM). Avoids Groq hangs
+    // on that tool call and gets the picker on screen reliably.
+    const human = lastHumanText(state);
+    if (wantsTimePicker(human)) {
+      return {
+        messages: [
+          new AIMessage({
+            content: `Sure — pick a time that works for you below, and I'll pass it along to ${deps.persona.owner.name}.`,
+            tool_calls: [{
+              name: "show_time_picker",
+              id: `tp-${Date.now()}`,
+              args: { reason: "visitor asked to schedule" },
+            }],
+          }),
+        ],
+      };
+    }
+
     const extra = state.leadSaved
       ? [new SystemMessage(
           "IMPORTANT: You have already recorded this visitor's contact details this session. Do NOT ask for their name/email again and do NOT call save_lead again — just chat naturally and help with whatever they say next.",

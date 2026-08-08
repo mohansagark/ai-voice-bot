@@ -23,9 +23,18 @@ export const saveLeadTool = tool(async (args: SaveLeadArgs) => JSON.stringify(ar
 
 // No side effects here either — the show_time_picker node sets the UI signal the SSE
 // stream forwards to the widget, which renders the picker inline in the chat.
+//
+// NOTE: schema must not be an empty object — Groq's tool-calling path has been observed
+// to hang indefinitely on `z.object({})` under the Workers runtime (primary + fallback
+// both hit the 20s invoke timeout → widget "hiccuped"). Keep at least one optional field.
 export const showTimePickerTool = tool(async () => "Time picker shown to visitor.", {
   name: "show_time_picker",
   description:
     "Show an inline date/time picker in the chat UI for the visitor to specify their preferred time to connect. Call this INSTEAD of asking 'what time works for you?' in plain text, once the visitor has expressed interest in scheduling/connecting and you don't yet have a stated time preference from them. Don't call it if they've already given one.",
-  schema: z.object({}),
+  schema: z.object({
+    reason: z
+      .string()
+      .optional()
+      .describe("Optional short note on why they want to connect (not shown to the visitor)."),
+  }),
 });
