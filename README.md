@@ -36,36 +36,153 @@ ai-voice-bot is the opposite path: a **Cloudflare Worker you deploy**, a **KV sy
 
 ## Quick start
 
+This is the end-to-end path to put the bot on **your** portfolio or project site.
+
+**Order matters:** procure keys → deploy Worker → add secrets → write config + knowledge → sync KV → verify `/health` → embed the widget. Until KV sync succeeds, production chat **fails closed** (`403`).
+
+### 1. Accounts and keys to procure
+
+| What | Where | Required? | Where it goes |
+|------|-------|-----------|---------------|
+| Cloudflare account | [dash.cloudflare.com](https://dash.cloudflare.com) | **Yes** | Hosts the Worker, KV, D1, Durable Objects |
+| `GROQ_API_KEY` | [console.groq.com](https://console.groq.com) | **Yes** | Worker **secret** (LLM + neural TTS) |
+| Orpheus TTS terms | [Groq Orpheus playground](https://console.groq.com/playground?model=canopylabs%2Forpheus-v1-english) | For neural voice | Accept once in the Groq console |
+| `WEBHOOK_URL` | Formspree / Zapier / your hook | Optional | Worker secret — lead ping |
+| `RESEND_API_KEY` + `LEAD_NOTIFY_FROM` + `LEAD_NOTIFY_TO` | [resend.com](https://resend.com) | Optional | Worker secrets — email on new lead |
+| `OPENROUTER_API_KEY` / `DEEPGRAM_API_KEY` | Vendor consoles | Optional | Worker secrets — alternate providers |
+
+**Never** put any of these in the browser, `NEXT_PUBLIC_*`, or the site config JSON. Only the Worker holds secrets.
+
+### 2. Clone and create Cloudflare bindings
+
 ```bash
-# 1. Clone + install Worker
 git clone https://github.com/mohansagark/ai-voice-bot.git
 cd ai-voice-bot/worker
 npm install
 npx wrangler login
 
-# 2. Create bindings (paste IDs into wrangler.toml)
 npx wrangler d1 create ai-voice-bot-db
 npx wrangler kv namespace create PORTFOLIO_KV
-
-# 3. Deploy → secrets → sync config → embed
-npx wrangler deploy
-npx wrangler secret put GROQ_API_KEY
-cd ..
-cp config/site-config.template.json ./mysite-config.json
-cp config/context.template.txt ./mysite-context.txt
-# edit both, then:
-node scripts/sync-config.mjs --config ./mysite-config.json --context ./mysite-context.txt
 ```
 
-Confirm sync, then embed the widget with your Worker URL:
+Paste the printed `database_id` and KV `id` into `worker/wrangler.toml` (see [wrangler.toml skeleton](#config-sync)). Comment out or replace any sample `routes` / custom domain with yours (or omit routes to use the default `*.workers.dev` URL).
+
+### 3. Deploy the Worker and add secrets
+
+```bash
+npx wrangler deploy
+# note the URL, e.g. https://ai-voice-bot.<your-subdomain>.workers.dev
+
+npx wrangler secret put GROQ_API_KEY
+# optional:
+# npx wrangler secret put WEBHOOK_URL
+# npx wrangler secret put RESEND_API_KEY
+# npx wrangler secret put LEAD_NOTIFY_FROM
+# npx wrangler secret put LEAD_NOTIFY_TO
+```
+
+Confirm `MODE = "prod"` in `wrangler.toml` for live traffic (local `wrangler dev` uses `.dev.vars` with `MODE=dev`).
+
+### 4. Write your site config (persona + allowlist + widget)
+
+```bash
+cd ..   # back to ai-voice-bot/
+cp config/site-config.template.json ./mysite-config.json
+```
+
+Edit `mysite-config.json`. The fields that matter for a portfolio:
+
+| Field | What to put |
+|-------|-------------|
+| `allowedOrigins` | Exact browser origins that may call the Worker — e.g. `https://www.yoursite.com`, `https://yoursite.com`. **HTTPS + host only** — no path, no trailing slash |
+| `persona.botName` | Display name of the assistant (e.g. `Leo`) |
+| `persona.owner.name` / `owner.role` | Your name and role |
+| `persona.bio` | Short owner bio the agent grounds on |
+| `persona.tone` | How it should sound |
+| `persona.facts` | Bullet facts visitors can ask about |
+| `persona.do_not` | Hard refusals (prices, dates, scheduling, …) |
+| `behavior.*` | Caps / TTS voice (safe to keep template defaults) |
+| `widget.branding.botName` / `greeting` | What the floating widget shows before chat starts |
+| `widget.voice.enabled` | `true` to enable tap-to-talk + speak replies |
+
+This JSON is **not** committed into `[vars]` in wrangler — it syncs into KV as `app_config`.
+
+### 5. Write the knowledge blob
+
+```bash
+cp config/context.template.txt ./mysite-context.txt
+```
+
+Fill `mysite-context.txt` with resume-style plain text: profile, experience, projects, skills, FAQs. This syncs to KV as `context` and is what makes answers specific to **you**.
+
+### 6. Sync config + knowledge into KV
+
+```bash
+node scripts/sync-config.mjs \
+  --config ./mysite-config.json \
+  --context ./mysite-context.txt
+```
+
+Requires Wrangler auth (`wrangler login` or `CLOUDFLARE_API_TOKEN`). Re-run this whenever you change persona, origins, or knowledge — **no Worker redeploy needed**.
+
+### 7. Verify the Worker is ready
 
 ```bash
 curl -s https://YOUR_WORKER_URL/health
-# healthy: "config":"kv", "origins": > 0
 ```
 
-> **First-deploy order:** Worker → secrets → KV sync → health check.  
-> Until `app_config` is synced, production **fails closed** (`403` on browser chat).
+Healthy production response looks like:
+
+```json
+{ "ok": true, "config": "kv", "origins": 2, "mode": "prod" }
+```
+
+| Field | Meaning |
+|-------|---------|
+| `"config": "kv"` | Sync ran — persona/allowlist loaded from KV |
+| `"origins": N` | `N > 0` — at least one origin allowed |
+| `"config": "bootstrap"` | Sync never ran — browser chat will `403` |
+
+### 8. Initiate the bot on your portfolio
+
+On every page where the widget should appear, load **public** config first, then the script. No API keys here:
+
+```html
+<script>
+  window.AiVoiceBotConfig = {
+    workerUrl: "https://YOUR_WORKER_URL",
+    branding: {
+      botName: "Leo",
+      greeting: "Hi, I'm Leo — ask me about their work or how to get in touch."
+    },
+    voice: {
+      enabled: true,
+      speakByDefault: false
+    }
+  };
+</script>
+<script
+  src="https://cdn.jsdelivr.net/npm/ai-voice-bot-widget@0.1.0/dist/ai-voice-bot.min.js"
+  defer
+></script>
+```
+
+| Tag / field | Purpose |
+|-------------|---------|
+| `workerUrl` | **Required.** Your deployed Worker origin (same host you curled for `/health`) |
+| `branding.botName` | Label in the widget chrome |
+| `branding.greeting` | First message visitors see |
+| `voice.enabled` | Show mic / allow spoken replies |
+| `voice.speakByDefault` | Auto-speak agent replies (`false` is usually better on portfolios) |
+
+**Checklist before you call it done**
+
+1. Site origin is listed in `allowedOrigins` (exact match to the browser `Origin`)
+2. `/health` shows `"config":"kv"` and `"origins"` > 0
+3. Page loads `AiVoiceBotConfig` **before** the widget script
+4. Open the site → widget appears → send a chat → get a grounded reply
+
+**Next.js / React:** put `workerUrl` in a public env (e.g. `NEXT_PUBLIC_VOICE_BOT_WORKER_URL`) and load the script from a client component — see [`widget/README.md`](widget/README.md). Keep Groq / Cloudflare tokens on the Worker or CI only.
 
 ---
 
@@ -124,28 +241,9 @@ Cloudflare Worker (yours)
 
 ---
 
-## Embed
+## Embed (reference)
 
-Public config only — **never** API keys:
-
-```html
-<script>
-  window.AiVoiceBotConfig = {
-    workerUrl: "https://YOUR_WORKER_URL",
-    branding: {
-      botName: "Leo",
-      greeting: "Hi, I'm Leo — how can I help?"
-    },
-    voice: { enabled: true, speakByDefault: false }
-  };
-</script>
-<script
-  src="https://cdn.jsdelivr.net/npm/ai-voice-bot-widget@0.1.0/dist/ai-voice-bot.min.js"
-  defer
-></script>
-```
-
-Or build from source:
+Full initiation steps are in [Quick start §8](#8-initiate-the-bot-on-your-portfolio). Build the widget from source if you prefer not to use the CDN:
 
 ```bash
 cd widget && npm install && npm run build
@@ -154,7 +252,7 @@ cd widget && npm install && npm run build
 
 | Host | How |
 |------|-----|
-| Plain HTML | Script tags above |
+| Plain HTML | `AiVoiceBotConfig` + script tag (Quick start §8) |
 | Next.js / React | Public env for `workerUrl` + client loader — see [`widget/README.md`](widget/README.md) |
 | CMS-driven sites | Build `mysite-config.json` from your CMS; sync on production deploy |
 
@@ -162,7 +260,7 @@ cd widget && npm install && npm run build
 
 ## Config sync
 
-Update persona / knowledge **without redeploying** the Worker:
+Re-sync after persona / knowledge edits (**no Worker redeploy**):
 
 ```bash
 node scripts/sync-config.mjs \
