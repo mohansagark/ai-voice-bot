@@ -92,6 +92,64 @@ describe("/chat (SSE + session memory)", () => {
     expect(res.status).toBe(403);
   });
 
+  // Origins come from ALLOWED_ORIGINS (env) or synced KV app_config — every embed host must be listed
+  // or the browser gets a CORS failure → widget "hiccup" message.
+  it("allows each origin listed in a multi-host ALLOWED_ORIGINS CSV", async () => {
+    const multiEnv = {
+      GROQ_API_KEY: "x",
+      ALLOWED_ORIGINS: "https://site.example,https://www.site.example,https://blog.site.example",
+    } as unknown as Env;
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    for (const origin of ["https://www.site.example", "https://blog.site.example"]) {
+      const req = new Request("https://w/chat", {
+        method: "POST",
+        headers: { origin, "content-type": "application/json" },
+        body: JSON.stringify({ session_id: `s-${origin}`, message: "hi" }),
+      });
+      const res = await app.fetch(req, multiEnv);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("access-control-allow-origin")).toBe(origin);
+    }
+  });
+
+  it("allows origins from synced KV app_config over empty env allowlist", async () => {
+    const kvEnv = {
+      GROQ_API_KEY: "x",
+      ALLOWED_ORIGINS: "",
+      PORTFOLIO_KV: {
+        get: async (key: string) =>
+          key === "app_config"
+            ? JSON.stringify({
+                allowedOrigins: ["https://blog.example.com"],
+                persona: {
+                  botName: "Leo",
+                  owner: { name: "Sam", role: "Engineer" },
+                  bio: "x",
+                  tone: "warm",
+                  facts: ["f"],
+                  do_not: [],
+                },
+              })
+            : null,
+      },
+    } as unknown as Env;
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    const res = await app.fetch(
+      new Request("https://w/chat", {
+        method: "POST",
+        headers: { origin: "https://blog.example.com", "content-type": "application/json" },
+        body: JSON.stringify({ session_id: "kv-origin", message: "hi" }),
+      }),
+      kvEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("access-control-allow-origin")).toBe("https://blog.example.com");
+  });
+
   it("rejects missing session_id/message with 400", async () => {
     const { getSession } = memSessions();
     const { makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });

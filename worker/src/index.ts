@@ -6,7 +6,7 @@
 // LLM call to hang forever with no error. Importing the web shim first forces the
 // correct (agent-free) runtime before anything else gets a chance to auto-detect wrong.
 import "openai/shims/web";
-import { loadConfig, type Env, type AppConfig, type Consent } from "./config";
+import { loadConfig, mergeKvAppConfig, type Env, type AppConfig, type Consent } from "./config";
 import { buildModel } from "./providers";
 import { buildGraph } from "./agent/graph";
 import { HumanMessage } from "@langchain/core/messages";
@@ -69,7 +69,10 @@ export function createApp(
   return {
     async fetch(request: Request, env: Env): Promise<Response> {
       const url = new URL(request.url);
-      const config: AppConfig = loadConfig(env);
+      // Env/vars are the bootstrap defaults; synced KV `app_config` (from portfolio-data /
+      // site config) overlays persona, allowlist, and behavior so the shared worker repo
+      // does not need personal SoT data committed in wrangler.toml.
+      const config: AppConfig = await mergeKvAppConfig(env, loadConfig(env));
       const origin = request.headers.get("origin") || "";
       const enforce = config.mode === "prod";
       const cors = corsHeaders(origin, config.allowedOrigins, !enforce);

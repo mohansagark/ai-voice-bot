@@ -21,6 +21,21 @@ export interface AppConfig {
   maxTtsChars: number;
 }
 
+/** Site config blob stored in PORTFOLIO_KV under key `app_config` (synced at deploy time). */
+export interface KvAppConfig {
+  allowedOrigins?: string[];
+  persona?: Partial<Persona> & { owner?: Partial<Persona["owner"]> };
+  behavior?: {
+    maxMessageChars?: number;
+    maxTurnsPerSession?: number;
+    ttsVoice?: string;
+    maxTtsChars?: number;
+    defaultProvider?: string;
+    mode?: "dev" | "prod";
+  };
+  widget?: Record<string, unknown>;
+}
+
 export interface Env {
   GROQ_API_KEY?: string;
   GEMINI_API_KEY?: string;
@@ -45,10 +60,8 @@ export interface Env {
   // Resend API key for lead notification emails — not Cloudflare Email Sending, which is
   // gated behind the Workers Paid plan.
   RESEND_API_KEY?: string;
-  // Optional, deployment-specific: a large formatted text blob of the site owner's full
-  // portfolio data (projects, experience, skills, etc), fetched at request time under the
-  // key "context". A KV namespace (not a secret/var) because secrets cap at 5.1KB and this
-  // repo is shared/forkable — nobody's actual portfolio content belongs committed here.
+  // Optional, deployment-specific: portfolio knowledge (`context`) + site app config
+  // (`app_config`) live in KV so the shared worker repo stays free of personal SoT data.
   PORTFOLIO_KV?: { get(key: string): Promise<string | null> };
 }
 
@@ -64,15 +77,20 @@ export const defaultPersona: Persona = {
   do_not: ["quote prices", "commit to dates", "schedule meetings"],
 };
 
+export function mergePersona(base: Persona, override?: Partial<Persona> & { owner?: Partial<Persona["owner"]> }): Persona {
+  if (!override) return base;
+  return {
+    ...base,
+    ...override,
+    owner: { ...base.owner, ...(override.owner ?? {}) },
+  };
+}
+
 export function loadPersona(env: Env): Persona {
   if (!env.PERSONA_JSON) return defaultPersona;
   try {
     const parsed = JSON.parse(env.PERSONA_JSON) as Partial<Persona>;
-    return {
-      ...defaultPersona,
-      ...parsed,
-      owner: { ...defaultPersona.owner, ...(parsed.owner ?? {}) },
-    };
+    return mergePersona(defaultPersona, parsed);
   } catch {
     return defaultPersona;
   }
@@ -107,6 +125,37 @@ export function loadConfig(env: Env): AppConfig {
     ttsVoice: env.TTS_VOICE || "hannah",
     maxTtsChars: Number(env.MAX_TTS_CHARS || "1200"),
   };
+}
+
+/** Overlay synced KV `app_config` on top of env-derived config. KV wins for app fields. */
+export function applyKvAppConfig(base: AppConfig, raw: KvAppConfig | null | undefined): AppConfig {
+  if (!raw || typeof raw !== "object") return base;
+  const b = raw.behavior ?? {};
+  return {
+    ...base,
+    persona: mergePersona(base.persona, raw.persona),
+    allowedOrigins: Array.isArray(raw.allowedOrigins) && raw.allowedOrigins.length
+      ? raw.allowedOrigins.map((s) => String(s).trim()).filter(Boolean)
+      : base.allowedOrigins,
+    maxMessageChars: b.maxMessageChars ?? base.maxMessageChars,
+    maxTurnsPerSession: b.maxTurnsPerSession ?? base.maxTurnsPerSession,
+    ttsVoice: b.ttsVoice ?? base.ttsVoice,
+    maxTtsChars: b.maxTtsChars ?? base.maxTtsChars,
+    defaultProvider: b.defaultProvider ?? base.defaultProvider,
+    mode: b.mode === "dev" || b.mode === "prod" ? b.mode : base.mode,
+  };
+}
+
+export async function mergeKvAppConfig(env: Env, base: AppConfig): Promise<AppConfig> {
+  if (!env.PORTFOLIO_KV) return base;
+  try {
+    const raw = await env.PORTFOLIO_KV.get("app_config");
+    if (!raw) return base;
+    return applyKvAppConfig(base, JSON.parse(raw) as KvAppConfig);
+  } catch (e) {
+    console.error("PORTFOLIO_KV app_config read failed (continuing with env/defaults):", String((e as Error).message));
+    return base;
+  }
 }
 
 export type { Consent } from "./agent/state";

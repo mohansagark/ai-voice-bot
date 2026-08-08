@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { loadConfig, loadPersona, defaultPersona, type Env } from "../src/config";
+import {
+  loadConfig,
+  loadPersona,
+  defaultPersona,
+  applyKvAppConfig,
+  mergePersona,
+  type Env,
+} from "../src/config";
 
 describe("loadPersona / loadConfig persona", () => {
   it("returns the default persona when PERSONA_JSON is not set", () => {
@@ -41,5 +48,40 @@ describe("loadPersona / loadConfig persona", () => {
   it("ships a generic default persona, not real personal/employer data", () => {
     expect(defaultPersona.owner.name).not.toBe("Mohan");
     expect(JSON.stringify(defaultPersona)).not.toMatch(/ServiceNow|Invesco|Reliance Jio|Jio Platforms/i);
+  });
+});
+
+describe("applyKvAppConfig", () => {
+  it("overlays persona and allowedOrigins from KV app_config", () => {
+    const base = loadConfig({} as Env);
+    const next = applyKvAppConfig(base, {
+      allowedOrigins: ["https://www.example.com", "https://blog.example.com"],
+      persona: {
+        botName: "Leo",
+        owner: { name: "Sam", role: "Engineer" },
+        bio: "Builder.",
+        tone: "warm",
+        facts: ["Sam builds things."],
+        do_not: ["quote prices"],
+      },
+      behavior: { maxTurnsPerSession: 12, mode: "prod" },
+    });
+    expect(next.allowedOrigins).toEqual(["https://www.example.com", "https://blog.example.com"]);
+    expect(next.persona.owner.name).toBe("Sam");
+    expect(next.maxTurnsPerSession).toBe(12);
+    expect(next.mode).toBe("prod");
+  });
+
+  it("keeps base config when KV overlay is empty", () => {
+    const base = loadConfig({ ALLOWED_ORIGINS: "https://a.test" } as Env);
+    expect(applyKvAppConfig(base, null)).toEqual(base);
+    expect(applyKvAppConfig(base, {})).toEqual(base);
+  });
+
+  it("mergePersona deep-merges owner", () => {
+    expect(mergePersona(defaultPersona, { owner: { name: "Sam" } }).owner).toEqual({
+      name: "Sam",
+      role: defaultPersona.owner.role,
+    });
   });
 });

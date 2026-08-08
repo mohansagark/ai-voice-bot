@@ -60,5 +60,17 @@ Open `widget/demo-embed.html` in a browser (with the Worker running from step 1)
 Leo — type or tap the mic — and prove the widget survives the demo page's deliberately hostile
 CSS via Shadow DOM isolation.
 
-Set `ALLOWED_ORIGINS` (CSV) in `worker/wrangler.toml` for production; for local dev leave it
-empty (all origins allowed) or set `MODE=dev`.
+Set application config (persona, allowlist, knowledge) via deploy-time sync — see
+[`config/STORAGE.md`](config/STORAGE.md). Do not commit personal site data into
+`worker/wrangler.toml`.
+
+```bash
+# Example: sync a site config + knowledge blob (requires wrangler auth)
+node scripts/sync-config.mjs \
+  --config ./config/example.json \
+  --context ./path/to/context.txt \
+  --secrets-from-env
+```
+
+For local Worker testing, leave allowlist empty or set `MODE=dev` in `worker/.dev.vars`
+(bypasses origin/rate/spam guards). API keys go in `.dev.vars`, never in the widget.
