@@ -228,7 +228,7 @@ node scripts/sync-config.mjs \
     "bio": "…",
     "tone": "warm, a little playful…",
     "facts": ["…"],
-    "do_not": ["quote prices", "commit to dates", "schedule meetings"]
+    "do_not": ["quote prices", "commit to delivery timelines", "confirm calendar availability or treat a preferred time as a booked meeting"]
   },
   "widget": {
     "branding": {

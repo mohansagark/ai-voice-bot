@@ -14,8 +14,18 @@ describe("buildSystemPrompt", () => {
   it("includes every allowed fact", () => {
     for (const fact of defaultPersona.facts) expect(prompt).toContain(fact);
   });
-  it("states the never-quote/commit/schedule rule", () => {
-    expect(prompt).toMatch(/never quote prices|commit to timelines|schedule/i);
+  it("states the never-quote/commit-timelines rule and allows meeting capture", () => {
+    expect(prompt).toMatch(/never quote prices/i);
+    expect(prompt).toMatch(/commit to delivery timelines/i);
+    expect(prompt).toMatch(/DO help visitors who want to meet/i);
+    expect(prompt).toMatch(/do NOT check his calendar/i);
+  });
+  it("defaults to minimal reply length and expands only when asked about the owner", () => {
+    expect(prompt).toMatch(/DEFAULT LENGTH: keep every reply minimal/i);
+    expect(prompt).toMatch(/EXPAND ONLY when the visitor clearly wants to know/i);
+  });
+  it("includes configured do_not rules from the persona", () => {
+    for (const rule of defaultPersona.do_not) expect(prompt).toContain(rule);
   });
   it("instructs to call save_lead", () => {
     expect(prompt).toContain("save_lead");
@@ -79,7 +89,7 @@ describe("buildSystemPrompt", () => {
   it("instructs recognizing the [Preferred time: ...] marker and passing it to save_lead without scheduling", () => {
     expect(prompt).toMatch(/\[Preferred time: \.\.\.\]/);
     expect(prompt).toMatch(/preferredTime field verbatim/i);
-    expect(prompt).toMatch(/do NOT confirm, schedule, or treat it as a booking/i);
+    expect(prompt).toMatch(/do NOT confirm availability|treat it as a booking/i);
   });
   it("instructs actually calling show_time_picker rather than just describing it in text", () => {
     expect(prompt).toMatch(/actually CALL the show_time_picker tool/i);

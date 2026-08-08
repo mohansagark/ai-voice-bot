@@ -17,8 +17,8 @@
     ],
     "do_not": [
       "quote prices",
-      "commit to dates",
-      "schedule meetings"
+      "commit to delivery timelines",
+      "confirm calendar availability or treat a preferred time as a booked meeting"
     ]
   },
   "behavior": {
