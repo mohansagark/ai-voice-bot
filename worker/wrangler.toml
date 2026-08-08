@@ -12,9 +12,9 @@ binding = "DB"
 database_name = "ai-voice-bot-db"
 database_id = "9f95be6d-0023-4360-8baa-2648add6eaf8"
 
-# Optional: deployment-specific portfolio content for Leo's system prompt (key "context").
-# Only the namespace id lives here — the actual content is set via `wrangler kv key put`
-# and never committed, since this repo is shared/forkable.
+# Application config (`app_config`) + portfolio knowledge (`context`) are synced into this
+# namespace at deploy time — see ../config/STORAGE.md and `node scripts/sync-config.mjs`.
+# Only the namespace id lives here; content is never committed.
 [[kv_namespaces]]
 binding = "PORTFOLIO_KV"
 id = "0ac98a2a6f5f428aafa4dd9e1d3f2feb"
@@ -25,14 +25,23 @@ id = "0ac98a2a6f5f428aafa4dd9e1d3f2feb"
 # D1 without them, just without an email ping.
 
 [vars]
-ALLOWED_ORIGINS = "https://devmohan.in,https://www.devmohan.in"
+# Application SoT (persona, allowlist, knowledge) is synced into PORTFOLIO_KV
+# (`app_config` + `context`) — do not commit personal site config here.
+# See ../config/STORAGE.md and `node scripts/sync-config.mjs`.
+#
+# ALLOWED_ORIGINS is intentionally NOT set here: it is per-deployment, not per-repo.
+# Origin enforcement fails CLOSED, so until `app_config` is synced (or ALLOWED_ORIGINS is
+# set as a Worker var in the Cloudflare dashboard) every browser request gets a 403.
+# `GET /health` reports `"config":"bootstrap","origins":0` in exactly that state.
+#
+# MODE is env-only on purpose. It is the master enforcement switch, and KV `app_config`
+# is not allowed to override it — see applyKvAppConfig in src/config.ts.
 DEFAULT_PROVIDER = "groq"
 MAX_MESSAGE_CHARS = "2000"
 MAX_TURNS_PER_SESSION = "30"
 MODE = "prod"
 TTS_VOICE = "hannah"
 MAX_TTS_CHARS = "1200"
-PERSONA_JSON = "{\"botName\":\"Leo\",\"owner\":{\"name\":\"Mohan\",\"role\":\"Senior Software Engineer\"},\"bio\":\"Senior Software Engineer with 9+ years building AI-powered products and high-performance frontend systems at scale — specializing in LLM integrations, agentic workflows, and real-time interfaces.\",\"tone\":\"playful, warm, and a little cheeky — a witty friend hyping Mohan up, never a corporate bio\",\"facts\":[\"Mohan is currently at ServiceNow, leading UX architecture for AI-powered agentic platforms, including a voice-enabled layer on Amazon Connect unifying multiple CCaaS providers.\",\"At Invesco, he led IVYGPT, an internal AI platform adopted by 8,000+ users that cut report analysis time from 30 days to 30 minutes.\",\"At Reliance Jio (Jio Platforms), he led a team of 10 engineers on platforms serving 5M+ users, improving page load time by roughly 90% — from 5 seconds down to 500ms.\",\"He specializes in LLM integrations, agentic workflows, prompt engineering, and RAG/semantic search, alongside deep React, React Native, Next.js, and Node.js expertise.\",\"He holds a BTech in Mechanical Engineering from VIT, and later completed full-stack development and data science programs at Scaler and Imarticus — a self-driven pivot into software and AI.\",\"He's earned an Engineering Excellence Award (Invesco, 2024) and an Innovation Champion award (Reliance Jio, 2023) for leading the redesign of the ResQ app, used by over a million users.\",\"He's open to freelance projects and full-time roles, especially anything meaty involving AI/agentic systems or gnarly frontend performance problems.\"],\"do_not\":[\"quote prices\",\"commit to dates\",\"schedule meetings\"]}"
 
 [[durable_objects.bindings]]
 name = "SESSION_DO"

@@ -92,6 +92,155 @@ describe("/chat (SSE + session memory)", () => {
     expect(res.status).toBe(403);
   });
 
+  // Origins come from ALLOWED_ORIGINS (env) or synced KV app_config — every embed host must be listed
+  // or the browser gets a CORS failure → widget "hiccup" message.
+  it("allows each origin listed in a multi-host ALLOWED_ORIGINS CSV", async () => {
+    const multiEnv = {
+      GROQ_API_KEY: "x",
+      ALLOWED_ORIGINS: "https://site.example,https://www.site.example,https://blog.site.example",
+    } as unknown as Env;
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    for (const origin of ["https://www.site.example", "https://blog.site.example"]) {
+      const req = new Request("https://w/chat", {
+        method: "POST",
+        headers: { origin, "content-type": "application/json" },
+        body: JSON.stringify({ session_id: `s-${origin}`, message: "hi" }),
+      });
+      const res = await app.fetch(req, multiEnv);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("access-control-allow-origin")).toBe(origin);
+    }
+  });
+
+  it("allows origins from synced KV app_config over empty env allowlist", async () => {
+    const kvEnv = {
+      GROQ_API_KEY: "x",
+      ALLOWED_ORIGINS: "",
+      PORTFOLIO_KV: {
+        get: async (key: string) =>
+          key === "app_config"
+            ? JSON.stringify({
+                allowedOrigins: ["https://blog.example.com"],
+                persona: {
+                  botName: "Leo",
+                  owner: { name: "Sam", role: "Engineer" },
+                  bio: "x",
+                  tone: "warm",
+                  facts: ["f"],
+                  do_not: [],
+                },
+              })
+            : null,
+      },
+    } as unknown as Env;
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    const res = await app.fetch(
+      new Request("https://w/chat", {
+        method: "POST",
+        headers: { origin: "https://blog.example.com", "content-type": "application/json" },
+        body: JSON.stringify({ session_id: "kv-origin", message: "hi" }),
+      }),
+      kvEnv,
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("access-control-allow-origin")).toBe("https://blog.example.com");
+  });
+
+  // Regression: the allowlist moved from wrangler [vars] to synced KV, so "empty" is now a
+  // reachable state (sync never ran, KV unbound, malformed blob). It must mean "deny", not "allow".
+  it("denies every origin in prod when the allowlist is empty and KV has no app_config", async () => {
+    const unsynced = { GROQ_API_KEY: "x", MODE: "prod", PORTFOLIO_KV: { get: async () => null } } as unknown as Env;
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    for (const path of ["/chat", "/lead", "/tts"]) {
+      const res = await app.fetch(
+        new Request(`https://w${path}`, {
+          method: "POST",
+          headers: { origin: "https://evil.example", "content-type": "application/json" },
+          body: JSON.stringify({ session_id: "s1", message: "hi", text: "hi" }),
+        }),
+        unsynced,
+      );
+      expect(res.status).toBe(403);
+      expect(res.headers.get("access-control-allow-origin")).toBe("null");
+    }
+  });
+
+  it("denies an unlisted origin even when KV app_config is present", async () => {
+    const kvEnv = {
+      GROQ_API_KEY: "x",
+      PORTFOLIO_KV: {
+        get: async (key: string) =>
+          key === "app_config" ? JSON.stringify({ allowedOrigins: ["https://good.example"] }) : null,
+      },
+    } as unknown as Env;
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    const res = await app.fetch(
+      new Request("https://w/chat", {
+        method: "POST",
+        headers: { origin: "https://evil.example", "content-type": "application/json" },
+        body: JSON.stringify({ session_id: "s1", message: "hi" }),
+      }),
+      kvEnv,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("ignores a KV-supplied mode:dev — content edits cannot disable enforcement", async () => {
+    const kvEnv = {
+      GROQ_API_KEY: "x",
+      MODE: "prod",
+      PORTFOLIO_KV: {
+        get: async (key: string) =>
+          key === "app_config"
+            ? JSON.stringify({ allowedOrigins: ["https://good.example"], behavior: { mode: "dev" } })
+            : null,
+      },
+    } as unknown as Env;
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    const res = await app.fetch(
+      new Request("https://w/chat", {
+        method: "POST",
+        headers: { origin: "https://evil.example", "content-type": "application/json" },
+        body: JSON.stringify({ session_id: "s1", message: "hi" }),
+      }),
+      kvEnv,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("/health reports bootstrap config so an unsynced deploy is visible", async () => {
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+
+    const unsynced = await app.fetch(new Request("https://w/health"), { GROQ_API_KEY: "x", MODE: "prod" } as unknown as Env);
+    const body = (await unsynced.json()) as Record<string, unknown>;
+    expect(body.ok).toBe(false);
+    expect(body.config).toBe("bootstrap");
+    expect(body.origins).toBe(0);
+    expect(body.warning).toBeTruthy();
+
+    const synced = await app.fetch(new Request("https://w/health"), {
+      GROQ_API_KEY: "x",
+      MODE: "prod",
+      PORTFOLIO_KV: { get: async () => JSON.stringify({ allowedOrigins: ["https://good.example"] }) },
+    } as unknown as Env);
+    const okBody = (await synced.json()) as Record<string, unknown>;
+    expect(okBody.ok).toBe(true);
+    expect(okBody.config).toBe("kv");
+    expect(okBody.origins).toBe(1);
+  });
+
   it("rejects missing session_id/message with 400", async () => {
     const { getSession } = memSessions();
     const { makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });

@@ -62,13 +62,14 @@ npx wrangler secret put WEBHOOK_URL
 ```
 Run these in a real terminal (not a piped/non-interactive shell) — they prompt for the value.
 
-**Lock it down to your site(s)** — edit `worker/wrangler.toml`:
-```toml
-[vars]
-ALLOWED_ORIGINS = "https://yoursite.com,https://www.yoursite.com"
+**Lock it down to your site(s)** — put `allowedOrigins` in a site config JSON and sync
+(see [`../config/STORAGE.md`](../config/STORAGE.md)); do not commit personal allowlists into
+`wrangler.toml`:
+```bash
+node ../scripts/sync-config.mjs --config ./mysite-config.json --secrets-from-env
 ```
-Leave empty during local development to allow all origins, or set `MODE=dev` in `.dev.vars` to
-bypass origin/rate/spam guards while testing. Redeploy after changing config: `npx wrangler deploy`.
+Leave allowlist empty during local development, or set `MODE=dev` in `.dev.vars` to
+bypass origin/rate/spam guards while testing.
 
 **Optional — custom domain** (e.g. `voicebot.yoursite.com` instead of the default `workers.dev`
 URL) — add to `wrangler.toml`:
@@ -185,7 +186,7 @@ works) if the browser can't provide raw mic-level access.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `{"error":"origin not allowed"}` in the console/network tab | Your site's origin isn't in the Worker's `ALLOWED_ORIGINS` | Add it in `worker/wrangler.toml` and redeploy, or set `MODE=dev` for local testing |
+| `{"error":"origin not allowed"}` in the console/network tab | Your site's origin isn't in synced `allowedOrigins` (KV `app_config`) | Add it to your site config and re-run `node scripts/sync-config.mjs`, or set `MODE=dev` for local testing |
 | Widget doesn't appear at all | `window.AiVoiceBotConfig` missing/typo'd, or set *after* the widget script ran | Check the browser console for a `[ai-voice-bot]` error; make sure the config `<script>` runs before the widget `<script>` |
 | Mic button greyed out | Browser doesn't support `SpeechRecognition` (Safari/Firefox), or `voice.enabled: false` | Expected in unsupported browsers — text still works. Check config if unintended |
 | No spoken reply, but text appears fine | `/tts` errored (missing/unaccepted Groq `canopylabs/orpheus-v1-english` terms) and browser TTS is also unavailable | Widget falls back silently by design — accept the model's terms in the Groq console, or ignore if browser TTS is acceptable |
