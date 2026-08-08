@@ -1,77 +1,54 @@
-# AI Voice Bot
+<p align="center">
+  <img src="assets/leo-bot-icon.png" alt="AI Voice Bot" width="160" />
+</p>
 
-Self-hosted agentic chat + voice greeter for any website.
+# ai-voice-bot
 
-- **Worker** (Cloudflare) — LangGraph agent, SSE chat, TTS, sessions, lead capture  
-- **Widget** — zero-dependency, Shadow DOM embed (~5.5 KB gzipped)  
-- **Config** — your persona / allowlist / knowledge synced into Workers KV at deploy time  
+**A self-hosted voice + chat greeter for your website.** Deploy your own Cloudflare Worker, sync your persona and knowledge, drop in a Shadow-DOM widget — visitors talk to *your* assistant, not a shared black box.
 
-There is **no shared hosted backend**. You deploy your own Worker, keep your own API keys, and embed the widget on your site.
+Fully yours. Your API keys, your allowlist, your leads, your knowledge. No hosted multi-tenant backend. Free Cloudflare Workers tier is enough for typical portfolio traffic.
 
-| Layer | What you put there | Never put here |
-| --- | --- | --- |
-| Cloudflare **secrets** | `GROQ_API_KEY`, optional TTS/email keys | — |
-| Cloudflare **KV** | `app_config` + `context` (via sync) | API keys |
-| Browser / widget | `workerUrl` + public branding | API keys |
+> Think of it as a friendly receptionist that actually knows your resume — chat or tap-to-talk, neural voice replies, lead capture when someone wants to reach you.
 
-Schema and storage details: [`config/STORAGE.md`](config/STORAGE.md) · [`config/schema.json`](config/schema.json)
-
----
-
-## Architecture
-
-```text
-Your site (HTML / React / Next.js / …)
-   │  public: workerUrl + widget branding
-   ▼
-Your Cloudflare Worker
-   │  secrets → LLM / TTS
-   │  KV app_config → persona, allowedOrigins, behavior
-   │  KV context → knowledge blob
-   ▼
-Visitor chat / voice
+```bash
+# 1) Deploy Worker  2) Sync config  3) Embed widget
+npx wrangler deploy
+node scripts/sync-config.mjs --config ./mysite-config.json --context ./mysite-context.txt
 ```
 
-**Fail-closed origins:** until `app_config` is synced with a non-empty `allowedOrigins`, production browser calls get `403`. Locally use `MODE=dev` in `.dev.vars`.
+```text
+your-site/
+└── <script> AiVoiceBotConfig.workerUrl = "https://voicebot.example.com"
+         │
+         ▼
+Cloudflare Worker (yours)
+├── secrets     GROQ_API_KEY, optional TTS / email keys
+├── KV          app_config  → persona, origins, behavior
+│               context     → knowledge blob
+├── DO          session memory
+└── D1          leads
+```
 
----
+## Install
 
-## Prerequisites
-
-- [Cloudflare](https://dash.cloudflare.com) account (Workers Free is enough for typical portfolio traffic)
-- Node.js 18+
-- [Groq API key](https://console.groq.com) (chat + optional neural TTS)
-- Optional: [Formspree](https://formspree.io) / webhook URL for leads  
-- Optional: [Resend](https://resend.com) for lead email notifications  
-- Optional: custom domain on Cloudflare DNS  
-
----
-
-## 1. Clone and install
+**Requires:** Node.js 18+, a [Cloudflare](https://dash.cloudflare.com) account, a [Groq](https://console.groq.com) API key
 
 ```bash
 git clone https://github.com/mohansagark/ai-voice-bot.git
 cd ai-voice-bot/worker
 npm install
+npx wrangler login
 ```
 
----
-
-## 2. Create Cloudflare resources
-
-From `worker/` (after `npx wrangler login`):
+Create bindings, then paste the IDs into `worker/wrangler.toml`:
 
 ```bash
-npx wrangler login
-
-# D1 (leads)
 npx wrangler d1 create ai-voice-bot-db
-
-# KV (app_config + context)
 npx wrangler kv namespace create PORTFOLIO_KV
 ```
 
-Copy the printed `database_id` and KV `id` into `worker/wrangler.toml`:
+<details>
+<summary><strong>wrangler.toml skeleton</strong></summary>
 
 ```toml
 name = "ai-voice-bot"
@@ -79,10 +56,8 @@ main = "src/index.ts"
 compatibility_date = "2024-09-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Optional custom domain (DNS must be on Cloudflare):
-# routes = [
-#   { pattern = "voicebot.example.com", custom_domain = true }
-# ]
+# Optional:
+# routes = [{ pattern = "voicebot.example.com", custom_domain = true }]
 
 [[d1_databases]]
 binding = "DB"
@@ -110,136 +85,55 @@ tag = "v1"
 new_sqlite_classes = ["SessionDO"]
 ```
 
-**Do not** commit personal `PERSONA_JSON` or `ALLOWED_ORIGINS` into `[vars]`. Those belong in the synced site config (next section).
+Do **not** commit personal persona / allowlist into `[vars]` — those sync into KV.
 
-Apply D1 migrations if your checkout includes SQL migrations under `worker/` (see repo `worker/` docs / `migrations` folder if present).
+</details>
 
----
-
-## 3. Local development
+**Local smoke test:**
 
 ```bash
-cd worker
-cp .dev.vars.example .dev.vars
+cp .dev.vars.example .dev.vars   # GROQ_API_KEY=...  MODE=dev
+npm test
+npm run dev                      # http://localhost:8787
 ```
 
-Minimum `.dev.vars`:
+<details>
+<summary><strong>Manual / one-shot production setup</strong></summary>
 
 ```bash
-GROQ_API_KEY=gsk_...
-MODE=dev
-# Optional:
-# WEBHOOK_URL=https://formspree.io/f/xxxx
-# DEEPGRAM_API_KEY=...
-# OPENROUTER_API_KEY=...
-# RESEND_API_KEY=...
-# LEAD_NOTIFY_FROM=Leo <bot@example.com>
-# LEAD_NOTIFY_TO=you@example.com
-```
-
-```bash
-npm test          # includes tsc --noEmit + vitest
-npm run dev       # http://localhost:8787
-curl -s http://localhost:8787/health
-```
-
-With `MODE=dev`, origin / spam / length guards are relaxed for local testing.
-
-**Widget locally:**
-
-```bash
-cd ../widget
-npm install
-npm run build
-# open demo-embed.html (point workerUrl at http://localhost:8787)
-```
-
----
-
-## 4. Production site config (template)
-
-Copy the production templates and edit them for your brand:
-
-```bash
-cp config/site-config.template.json ./mysite-config.json
-cp config/context.template.txt ./mysite-context.txt
-```
-
-### `mysite-config.json` (→ KV `app_config`)
-
-| Field | Required | Notes |
-| --- | --- | --- |
-| `allowedOrigins` | **Yes** | Exact browser origins, e.g. `https://www.example.com` — **no path, no trailing slash** |
-| `persona` | **Yes** | `botName`, `owner`, `bio`, `tone`, `facts[]`, `do_not[]` |
-| `behavior` | Optional | Caps, TTS voice, provider — **not** `mode` (mode stays a Worker env var) |
-| `widget` | Optional | Public branding / greeting / voice UX for your site loader |
-
-Full JSON Schema: [`config/schema.json`](config/schema.json)  
-Example: [`config/example.json`](config/example.json) · Template: [`config/site-config.template.json`](config/site-config.template.json)
-
-### `mysite-context.txt` (→ KV `context`)
-
-Plain-text knowledge the model uses for specifics (projects, jobs, skills). Keep it factual. Template: [`config/context.template.txt`](config/context.template.txt)
-
----
-
-## 5. Deploy Worker + secrets + sync
-
-**Order matters on first deploy:**
-
-1. Deploy the Worker (bindings must exist)  
-2. Put secrets  
-3. Sync KV (`app_config` + `context`)  
-4. Confirm `/health` shows `"config":"kv"`  
-
-```bash
-cd worker
+# Deploy code
 npx wrangler deploy
 
-# Secrets (prompted interactively — or pipe from a secure env)
+# Secrets (interactive)
 npx wrangler secret put GROQ_API_KEY
-# npx wrangler secret put WEBHOOK_URL
-# npx wrangler secret put OPENROUTER_API_KEY
-# npx wrangler secret put DEEPGRAM_API_KEY
-# npx wrangler secret put RESEND_API_KEY
-# npx wrangler secret put LEAD_NOTIFY_FROM
-# npx wrangler secret put LEAD_NOTIFY_TO
+# optional: WEBHOOK_URL, OPENROUTER_API_KEY, DEEPGRAM_API_KEY,
+#           RESEND_API_KEY, LEAD_NOTIFY_FROM, LEAD_NOTIFY_TO
+
+# Site config (copy templates from config/)
+cp ../config/site-config.template.json ../mysite-config.json
+cp ../config/context.template.txt ../mysite-context.txt
+# edit both files — set allowedOrigins to exact https://host values (no path/slash)
 
 cd ..
-export GROQ_API_KEY=...   # only if using --secrets-from-env
 node scripts/sync-config.mjs \
   --config ./mysite-config.json \
   --context ./mysite-context.txt \
   --secrets-from-env
 ```
 
-`sync-config.mjs` upserts KV and, with `--secrets-from-env`, any of these if present in the environment:  
-`GROQ_API_KEY`, `DEEPGRAM_API_KEY`, `OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `RESEND_API_KEY`, `LEAD_NOTIFY_FROM`, `LEAD_NOTIFY_TO`, `WEBHOOK_URL`.
-
-Auth: `wrangler login` **or** `CLOUDFLARE_API_TOKEN` (Workers KV Edit).
-
-### Verify
+**First-deploy order:** Worker → secrets → KV sync → confirm health.  
+Until `app_config` is synced, production **fails closed** (`403` on browser chat).
 
 ```bash
-curl -s https://YOUR_WORKER_URL/health | jq .
-# Expect: "config": "kv", "origins": <n>, "mode": "prod", "ok": true
-
-curl -sN -X POST https://YOUR_WORKER_URL/chat \
-  -H 'Origin: https://www.example.com' \
-  -H 'Content-Type: application/json' \
-  -d '{"session_id":"smoke-1","message":"Hi","history":[]}'
-# Expect: HTTP 200 + SSE token events
+curl -s https://YOUR_WORKER_URL/health
+# healthy: "config":"kv", "origins": > 0
 ```
 
-If you see `"config":"bootstrap"` or `origins: 0`, sync did not land — chat from browsers will 403.
+</details>
 
----
+## Usage
 
-## 6. Embed the widget
-
-**Never** put API keys in the page.
-
-### HTML
+**Embed (public config only — never API keys):**
 
 ```html
 <script>
@@ -258,20 +152,14 @@ If you see `"config":"bootstrap"` or `origins: 0`, sync did not land — chat fr
 ></script>
 ```
 
-Or serve `widget/dist/ai-voice-bot.min.js` from your own origin after `npm run build` in `widget/`.
+Or build from source:
 
-### React / Next.js
+```bash
+cd widget && npm install && npm run build
+# → widget/dist/ai-voice-bot.min.js
+```
 
-Set only a **public** Worker URL in the host env, e.g. `NEXT_PUBLIC_LEO_WORKER_URL`.  
-Load branding from your CMS/static JSON if you want — still public-only.
-
-More embed options: [`widget/README.md`](widget/README.md)
-
----
-
-## 7. Updating config in production
-
-Edit `mysite-config.json` / `mysite-context.txt`, then re-run:
+**Update persona / knowledge without redeploying the Worker:**
 
 ```bash
 node scripts/sync-config.mjs \
@@ -279,70 +167,114 @@ node scripts/sync-config.mjs \
   --context ./mysite-context.txt
 ```
 
-No Worker redeploy needed for persona / origins / knowledge changes.  
-Redeploy the Worker only when **code** or **wrangler bindings/vars** change.
+**Useful endpoints**
 
-Optional automation: run the same sync from CI on your content repo’s deploy (pass `CLOUDFLARE_API_TOKEN`). That is integration glue for *your* site — not required to use this package.
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/health` | `config`, `origins`, provider, mode |
+| `POST` | `/chat` | SSE agent replies |
+| `POST` | `/tts` | Neural speech |
+| `POST` | `/lead` | Direct lead capture |
 
----
+Works with any host page that can load a script tag:
 
-## Configuration reference
+| Host | How |
+|------|-----|
+| Plain HTML | Script tags above |
+| Next.js / React | Public env for `workerUrl` + client loader — see [`widget/README.md`](widget/README.md) |
+| CMS-driven sites | Build `mysite-config.json` from your CMS; sync on production deploy |
 
-### Worker secrets
+## What you get
 
-| Secret | Required | Purpose |
-| --- | --- | --- |
-| `GROQ_API_KEY` | Yes | Chat (+ neural TTS if enabled) |
-| `OPENROUTER_API_KEY` | No | Chat fallback |
-| `DEEPGRAM_API_KEY` | No | TTS fallback |
-| `WEBHOOK_URL` | No | Lead webhook |
-| `RESEND_API_KEY` | No | Lead email |
-| `LEAD_NOTIFY_FROM` / `LEAD_NOTIFY_TO` | No | Lead email addresses |
+**Streaming chat** — LangGraph agent over SSE, session memory via Durable Objects
 
-### Worker `[vars]` (non-secret)
+**Voice** — tap-to-talk (`SpeechRecognition`) + Groq neural TTS with browser TTS fallback
 
-| Var | Default | Notes |
-| --- | --- | --- |
-| `MODE` | `prod` | `dev` relaxes guards — **env only**, not syncable from KV |
-| `DEFAULT_PROVIDER` | `groq` | |
-| `MAX_MESSAGE_CHARS` | `2000` | Overridable via synced `behavior` |
-| `MAX_TURNS_PER_SESSION` | `30` | |
-| `TTS_VOICE` / `MAX_TTS_CHARS` | `hannah` / `1200` | |
+**Grounded answers** — persona facts + optional long-form `context` knowledge blob
 
-### Neural TTS
+**Lead capture** — agent tool + optional webhook / Resend email
 
-Accept Groq model terms once:  
-[canopylabs/orpheus-v1-english](https://console.groq.com/playground?model=canopylabs%2Forpheus-v1-english)  
-Otherwise the widget falls back to browser `speechSynthesis`.
+**Fail-closed CORS** — only origins you sync; empty allowlist denies everyone in prod
 
----
+**Shadow DOM widget** — ~5.5 KB gzipped, won't fight your site CSS
 
-## Troubleshooting
+**Honest ops** — `/health` tells you `bootstrap` vs `kv` so you know if sync ran
 
-| Symptom | Likely cause | Fix |
-| --- | --- | --- |
-| `/health` → `"config":"bootstrap"` | KV sync never ran | Run `sync-config.mjs` |
-| `{"error":"origin not allowed"}` | Origin not in `allowedOrigins` or path/slash in entry | Use exact `https://host` only; re-sync |
-| Widget “hiccup” message | CORS / 403 / network | Check Origin allowlist + Worker URL |
-| No spoken audio | Groq TTS terms / missing key | Accept model terms or rely on browser TTS |
-| Chat works in `wrangler dev` but not prod | `MODE=dev` locally only | Sync `app_config` for prod |
+Every browser-facing page only receives **public** config. LLM keys stay in Worker secrets.
 
----
+## Production config template
 
-## Repo layout
-
-```text
-ai-voice-bot/
-├── config/           # schema, templates, storage map
-├── scripts/          # sync-config.mjs (deploy-time)
-├── worker/           # Cloudflare Worker
-└── widget/           # embeddable frontend (npm: ai-voice-bot-widget)
+```bash
+cp config/site-config.template.json ./mysite-config.json
+cp config/context.template.txt ./mysite-context.txt
 ```
 
-Design history (optional): `docs/superpowers/`
+| File | KV key | Contains |
+|------|--------|----------|
+| `mysite-config.json` | `app_config` | `allowedOrigins`, `persona`, `behavior`, `widget` |
+| `mysite-context.txt` | `context` | Plain-text knowledge (projects, jobs, skills…) |
 
----
+- Origins must be exact browser `Origin` values: `https://www.example.com` — **no path, no trailing slash**
+- `mode` is a Worker env var only — not syncable (CMS cannot disable abuse guards)
+- Schema: [`config/schema.json`](config/schema.json) · Storage map: [`config/STORAGE.md`](config/STORAGE.md)
 
-## License / contributing
+<details>
+<summary><strong>Minimal mysite-config.json shape</strong></summary>
 
-See repository license. PRs welcome — run `cd worker && npm test` before pushing.
+```json
+{
+  "allowedOrigins": ["https://www.example.com", "https://example.com"],
+  "persona": {
+    "botName": "Leo",
+    "owner": { "name": "Alex", "role": "Software Engineer" },
+    "bio": "…",
+    "tone": "warm, a little playful…",
+    "facts": ["…"],
+    "do_not": ["quote prices", "commit to dates", "schedule meetings"]
+  },
+  "widget": {
+    "branding": {
+      "botName": "Leo",
+      "greeting": "Hi, I'm Leo — Alex's assistant."
+    },
+    "voice": { "enabled": true, "speakByDefault": false }
+  }
+}
+```
+
+</details>
+
+## Tech stack
+
+Cloudflare Workers + Durable Objects + KV + D1 · LangGraph.js · Groq (OpenAI-compatible) · Shadow DOM widget · optional Deepgram / OpenRouter / Resend. No Neo4j, no vector DB required for the default path.
+
+| Piece | Path |
+|-------|------|
+| Worker | [`worker/`](worker/) |
+| Widget (npm) | [`widget/`](widget/) · [`ai-voice-bot-widget`](https://www.npmjs.com/package/ai-voice-bot-widget) |
+| Sync CLI | [`scripts/sync-config.mjs`](scripts/sync-config.mjs) |
+| Templates | [`config/`](config/) |
+
+<details>
+<summary><strong>Troubleshooting</strong></summary>
+
+| Symptom | Fix |
+|---------|-----|
+| `/health` → `"config":"bootstrap"` | Run `sync-config.mjs` |
+| `origin not allowed` / widget hiccup | Add exact origin; re-sync |
+| No neural voice | Accept [Orpheus terms](https://console.groq.com/playground?model=canopylabs%2Forpheus-v1-english) on Groq |
+| Works in `wrangler dev` only | You probably have `MODE=dev` locally — sync KV for prod |
+
+</details>
+
+<details>
+<summary><strong>Contributing</strong></summary>
+
+```bash
+cd worker && npm test    # tsc --noEmit + vitest
+cd ../widget && npm test
+```
+
+Design notes live under `docs/superpowers/`. PRs welcome.
+
+</details>
