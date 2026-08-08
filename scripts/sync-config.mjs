@@ -91,7 +91,9 @@ function kvPut(key, value, dryRun) {
       console.log(`  (dry-run) skip wrangler kv key put ${key}`);
       return;
     }
-    wrangler(["kv", "key", "put", key, "--binding", "PORTFOLIO_KV", "--remote", "--path", path], {});
+    // No --remote: this repo pins wrangler v3, where the flag doesn't exist. Remote is the
+    // default whenever --local is absent, on both v3 and v4.
+    wrangler(["kv", "key", "put", key, "--binding", "PORTFOLIO_KV", "--path", path], {});
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
