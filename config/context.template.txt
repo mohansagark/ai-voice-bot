@@ -1,0 +1,19 @@
+=== PROFILE ===
+Alex Example — Software Engineer, based in Example City.
+Short bio of the site owner. Keep this factual; the bot will ground answers here.
+
+=== EXPERIENCE ===
+- Acme Corp — Senior Engineer, Jan 2022–present: Built product features and led a small team.
+- Startup Co — Engineer, Jun 2019–Dec 2021: Shipped the first version of the core product.
+
+=== PROJECTS ===
+- Example Project: What it does, who it is for, and the outcome. Tech: React, Node.js.
+
+=== SKILLS ===
+Frontend: React, TypeScript, Next.js
+Backend: Node.js, APIs
+AI: LLM integrations, prompt engineering
+
+=== OTHER ===
+Add education, achievements, services, or testimonials as needed.
+This file is plain text. It is synced to Cloudflare KV as the key `context`.

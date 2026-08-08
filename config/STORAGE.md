@@ -1,10 +1,13 @@
 # Configuration storage map
 
+> **Installer guide:** see the root [README.md](../README.md) for the full self-host setup.  
+> This file is the storage contract + failure semantics reference.
+
 | Kind | Source | Cloudflare destination | Runtime reader |
 | --- | --- | --- | --- |
 | API keys | Deploy/CI env vars (`GROQ_API_KEY`, …) | Worker **secrets** | `env.*` |
-| Persona, allowlist, behavior, widget public | Site config JSON (`config/example.json` shape) | KV key **`app_config`** | `mergeKvAppConfig` |
-| Portfolio / knowledge text | Built from content SoT (e.g. portfolio-data) | KV key **`context`** | `getPortfolioContext` |
+| Persona, allowlist, behavior, widget public | Site config JSON ([`site-config.template.json`](./site-config.template.json)) | KV key **`app_config`** | `mergeKvAppConfig` |
+| Portfolio / knowledge text | Plain text / CMS export | KV key **`context`** | `getPortfolioContext` |
 | Widget bootstrap on the live site | `widget` slice of config (public) | Host site static file / loader | Browser only |
 | Infra (D1/KV/DO ids, routes) | `worker/wrangler.toml` | Worker bindings | Wrangler deploy |
 
@@ -15,8 +18,8 @@
 ```bash
 # From ai-voice-bot/
 node scripts/sync-config.mjs \
-  --config ./path/to/site-config.json \
-  --context ./path/to/context.txt \
+  --config ./mysite-config.json \
+  --context ./mysite-context.txt \
   --secrets-from-env
 ```
 
@@ -40,33 +43,25 @@ Consequences worth knowing before you deploy:
 `GET /health` is the diagnostic:
 
 ```json
-{ "ok": false, "config": "bootstrap", "origins": 0,
-  "warning": "running on bootstrap config — run the deploy-time KV sync, see config/STORAGE.md" }
+{
+  "ok": true,
+  "config": "kv",
+  "origins": 2,
+  "mode": "prod"
+}
 ```
 
 `"config": "kv"` with a non-zero `origins` is the healthy state. `"config": "bootstrap"` in prod
-means the sync never ran.
+means the sync never ran (chat from browsers will 403).
 
-## First-deploy / rollout order
+## Example: multi-repo CMS integration
 
-The three repos have a hard ordering dependency. Both wrong orders break production: deploying
-the Worker first leaves it 403-ing on bootstrap config, and merging the portfolio before the
-content SoT is published makes its `prebuild` exit non-zero, which fails the whole Vercel deploy.
+If your content SoT is a separate CMS repo and your marketing site deploys on Vercel (or similar),
+a working pattern is:
 
-1. Merge and deploy the content SoT (`portfolio-data`). Confirm the file is actually served:
-   ```bash
-   curl -fsI https://admin.devmohan.in/data/chatbot.json
-   ```
-2. Set `CLOUDFLARE_API_TOKEN` on the portfolio's Vercel project (Workers KV Edit, scoped to this
-   namespace only).
-3. Merge the portfolio (`next-gen-portfolio`). Its `prebuild` runs `sync:leo`; the build log must
-   show `→ KV put app_config` and `→ KV put context`.
-4. Verify KV directly before touching the Worker:
-   ```bash
-   npx wrangler kv key get app_config --namespace-id 0ac98a2a6f5f428aafa4dd9e1d3f2feb --remote
-   ```
-5. Only now deploy the Worker (`ai-voice-bot`), then confirm `GET /health` reports
-   `"config":"kv"` with a non-zero `origins`.
+1. Publish site config / knowledge from the CMS (or build it in CI).
+2. On **production** site deploy, run the same sync (`app_config` + `context` → KV) with
+   `CLOUDFLARE_API_TOKEN`.
+3. Deploy Worker code only when the Worker changes; config sync does not require a Worker redeploy.
 
-Steady state after the first rollout is order-independent: a CMS edit pushes to `portfolio-data`,
-which fires the Vercel deploy hook, which re-runs the sync.
+Gate sync to production deploys so preview builds cannot overwrite live KV.

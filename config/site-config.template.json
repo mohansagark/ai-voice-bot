@@ -1,0 +1,51 @@
+{
+  "allowedOrigins": [
+    "https://www.example.com",
+    "https://example.com"
+  ],
+  "persona": {
+    "botName": "Leo",
+    "owner": {
+      "name": "Alex",
+      "role": "Software Engineer"
+    },
+    "bio": "A software engineer who enjoys building things and solving interesting problems.",
+    "tone": "warm, a little playful, and genuinely curious — a friendly guide, never a corporate bio",
+    "facts": [
+      "Alex works across full-stack development and enjoys tackling hard technical problems.",
+      "Alex specializes in building reliable product experiences end to end.",
+      "Alex is open to freelance projects and full-time roles."
+    ],
+    "do_not": [
+      "quote prices",
+      "commit to dates",
+      "schedule meetings"
+    ]
+  },
+  "behavior": {
+    "defaultProvider": "groq",
+    "maxMessageChars": 2000,
+    "maxTurnsPerSession": 30,
+    "ttsVoice": "hannah",
+    "maxTtsChars": 1200
+  },
+  "widget": {
+    "branding": {
+      "botName": "Leo",
+      "greeting": "Hi, I'm Leo — Alex's assistant. Ask me about their work, projects, or how to get in touch."
+    },
+    "behavior": {
+      "autoGreet": true,
+      "rememberReturning": true,
+      "language": "en-US"
+    },
+    "privacy": {
+      "consentText": "I agree to share my info so I can be followed up with.",
+      "privacyPolicyUrl": null
+    },
+    "voice": {
+      "enabled": true,
+      "speakByDefault": false
+    }
+  }
+}
