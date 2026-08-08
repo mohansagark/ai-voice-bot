@@ -82,7 +82,7 @@ export const defaultPersona: Persona = {
     "Alex works across full-stack development and enjoys tackling hard technical problems.",
     "Alex is open to freelance projects and full-time roles.",
   ],
-  do_not: ["quote prices", "commit to dates", "schedule meetings"],
+  do_not: ["quote prices", "commit to delivery timelines", "confirm calendar availability or treat a preferred time as a booked meeting"],
 };
 
 /** Drop keys whose value is undefined so a partial overlay can never blank a base field. */
