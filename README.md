@@ -72,5 +72,7 @@ node scripts/sync-config.mjs \
   --secrets-from-env
 ```
 
-For local Worker testing, leave allowlist empty or set `MODE=dev` in `worker/.dev.vars`
-(bypasses origin/rate/spam guards). API keys go in `.dev.vars`, never in the widget.
+For local Worker testing set `MODE=dev` in `worker/.dev.vars` (bypasses origin/rate/spam
+guards). An empty allowlist does **not** work for this — enforcement fails closed, so in
+prod mode an empty or unsynced allowlist denies every browser request. API keys go in
+`.dev.vars`, never in the widget.

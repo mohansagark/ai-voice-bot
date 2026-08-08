@@ -15,10 +15,13 @@
       "Alex works across full-stack development and enjoys tackling hard technical problems.",
       "Alex is open to freelance projects and full-time roles."
     ],
-    "do_not": ["quote prices", "commit to dates", "schedule meetings"]
+    "do_not": [
+      "quote prices",
+      "commit to dates",
+      "schedule meetings"
+    ]
   },
   "behavior": {
-    "mode": "prod",
     "defaultProvider": "groq",
     "maxMessageChars": 2000,
     "maxTurnsPerSession": 30,
