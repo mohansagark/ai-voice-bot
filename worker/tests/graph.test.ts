@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { saveLeadSchema, saveLeadTool } from "../src/agent/tools";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { buildGraph } from "../src/agent/graph";
-import { AGENT_INVOKE_TIMEOUT_MS, wantsTimePicker } from "../src/agent/nodes";
+import { AGENT_INVOKE_TIMEOUT_MS, wantsTimePicker, parsePreferredTime } from "../src/agent/nodes";
 import type { ChatModelLike } from "../src/providers";
 import { defaultPersona } from "../src/config";
 import type { LeadRow } from "../src/leads-store";
@@ -80,7 +80,8 @@ describe("graph", () => {
     });
     const { deps: d, calls } = deps([toolCall]);
     const g = buildGraph(d);
-    await g.invoke({ messages: [new HumanMessage("[Preferred time: Wed, Aug 5 — Afternoon] I'm Jane, jane@x.com")] });
+    // Human text must not be a bare picker marker (that fast-paths without the LLM).
+    await g.invoke({ messages: [new HumanMessage("I'm Jane, jane@x.com — Wed afternoon works")] });
     expect(calls[0].preferredTime).toBe("Wed, Aug 5 — Afternoon");
   });
 
@@ -151,7 +152,7 @@ describe("graph", () => {
     expect(String(systemMsg.content)).not.toContain("PORTFOLIO KNOWLEDGE");
   });
 
-  it("times out a hung LLM invoke instead of hanging forever, surfacing a clear error", async () => {
+  it("times out a hung LLM invoke and soft-recovers with a retry line", async () => {
     vi.useFakeTimers();
     try {
       const hangingModel: ChatModelLike = {
@@ -159,9 +160,9 @@ describe("graph", () => {
       };
       const g = buildGraph({ model: hangingModel, persona: defaultPersona, persistLead: async () => {} });
       const promise = g.invoke({ messages: [new HumanMessage("hello")] });
-      const assertion = expect(promise).rejects.toThrow(/LLM invoke timed out/i);
       await vi.advanceTimersByTimeAsync(AGENT_INVOKE_TIMEOUT_MS + 100);
-      await assertion;
+      const out = await promise;
+      expect(String(out.messages.at(-1)?.content)).toMatch(/blanked for a second/i);
     } finally {
       vi.useRealTimers();
     }
@@ -177,12 +178,13 @@ describe("graph", () => {
     expect(String(out.messages.at(-1)?.content)).toBe("Hi from the fallback!");
   });
 
-  it("propagates the primary's error when no fallback model is configured", async () => {
+  it("soft-recovers when the primary fails and no fallback model is configured", async () => {
     const failingModel: ChatModelLike = {
       bindTools: () => ({ invoke: () => Promise.reject(new Error("429 rate limited")) }),
     };
     const g = buildGraph({ model: failingModel, persona: defaultPersona, persistLead: async () => {} });
-    await expect(g.invoke({ messages: [new HumanMessage("hello")] })).rejects.toThrow(/429 rate limited/);
+    const out = await g.invoke({ messages: [new HumanMessage("hello")] });
+    expect(String(out.messages.at(-1)?.content)).toMatch(/blanked for a second/i);
   });
 });
 
@@ -198,6 +200,15 @@ describe("wantsTimePicker", () => {
   });
 });
 
+describe("parsePreferredTime", () => {
+  it("extracts the picker selection", () => {
+    expect(parsePreferredTime("[Preferred time: Sat, Aug 15 — 11:30 AM]")).toBe("Sat, Aug 15 — 11:30 AM");
+  });
+  it("returns null when absent", () => {
+    expect(parsePreferredTime("hi there")).toBeNull();
+  });
+});
+
 describe("show_time_picker tool", () => {
   it("fast-paths schedule intent without calling the LLM", async () => {
     const { deps: d, model } = deps([new AIMessage("should not be used")]);
@@ -207,6 +218,18 @@ describe("show_time_picker tool", () => {
     });
     expect(out.uiComponent).toBe("time_picker");
     expect(String(out.messages.at(-1)?.content)).toMatch(/pick a time/i);
+    expect(model.invocations).toHaveLength(0);
+  });
+
+  it("fast-paths a preferred-time picker confirmation without calling the LLM", async () => {
+    const { deps: d, model } = deps([new AIMessage("should not be used")]);
+    const g = buildGraph(d);
+    const out = await g.invoke({
+      messages: [new HumanMessage("[Preferred time: Sat, Aug 15 — 11:30 AM]")],
+    });
+    expect(out.uiComponent).toBe(null);
+    expect(String(out.messages.at(-1)?.content)).toMatch(/11:30 AM/);
+    expect(String(out.messages.at(-1)?.content)).toMatch(/email/i);
     expect(model.invocations).toHaveLength(0);
   });
 

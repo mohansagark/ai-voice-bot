@@ -1,7 +1,7 @@
 import { AIMessage, SystemMessage, ToolMessage } from "@langchain/core/messages";
 import type { ChatStateType } from "./state";
 import type { ChatModelLike } from "../providers";
-import { saveLeadTool, saveLeadSchema, showTimePickerTool } from "./tools";
+import { saveLeadTool, saveLeadSchema } from "./tools";
 import { buildSystemPrompt } from "../prompts";
 import { isValidEmail } from "../leads";
 import type { LeadRow } from "../leads-store";
@@ -68,6 +68,13 @@ export function wantsTimePicker(text: string): boolean {
   );
 }
 
+/** Extract a widget time-picker selection, if present. */
+export function parsePreferredTime(text: string): string | null {
+  const m = text.match(/\[Preferred time:\s*([^\]]+)\]/i);
+  const v = m?.[1]?.trim();
+  return v || null;
+}
+
 function lastHumanText(state: ChatStateType): string {
   for (let i = state.messages.length - 1; i >= 0; i--) {
     const m = state.messages[i] as { _getType?: () => string; getType?: () => string; content?: unknown };
@@ -79,17 +86,20 @@ function lastHumanText(state: ChatStateType): string {
 
 export function makeAgentNode(deps: AgentDeps) {
   const system = new SystemMessage(buildSystemPrompt(deps.persona, deps.portfolioContext));
-  const bound = deps.model.bindTools([saveLeadTool, showTimePickerTool]);
-  const fallbackBound = deps.fallbackModel?.bindTools([saveLeadTool, showTimePickerTool]);
+  // Only bind save_lead. show_time_picker is handled by the schedule fast-path below —
+  // binding it made Groq tool-calling hang (empty or flaky schemas → widget hiccups).
+  const bound = deps.model.bindTools([saveLeadTool]);
+  const fallbackBound = deps.fallbackModel?.bindTools([saveLeadTool]);
   return async (state: ChatStateType): Promise<Partial<ChatStateType>> => {
-    // Fast path: schedule intent → synthetic show_time_picker (no LLM). Avoids Groq hangs
-    // on that tool call and gets the picker on screen reliably.
     const human = lastHumanText(state);
+    const owner = deps.persona.owner.name;
+
+    // Fast path: schedule intent → synthetic show_time_picker (no LLM).
     if (wantsTimePicker(human)) {
       return {
         messages: [
           new AIMessage({
-            content: `Sure — pick a time that works for you below, and I'll pass it along to ${deps.persona.owner.name}.`,
+            content: `Sure — pick a time that works for you below, and I'll pass it along to ${owner}.`,
             tool_calls: [{
               name: "show_time_picker",
               id: `tp-${Date.now()}`,
@@ -97,6 +107,23 @@ export function makeAgentNode(deps: AgentDeps) {
             }],
           }),
         ],
+      };
+    }
+
+    // Fast path: visitor just confirmed a slot in the picker — don't risk an LLM hang.
+    const preferred = parsePreferredTime(human);
+    if (preferred) {
+      if (state.leadSaved) {
+        return {
+          messages: [new AIMessage(
+            `Got it — ${preferred}. I'll make sure ${owner} sees that preference.`,
+          )],
+        };
+      }
+      return {
+        messages: [new AIMessage(
+          `Perfect — I've noted ${preferred}. What's the best email to reach you at, and what should I tell ${owner} this is about?`,
+        )],
       };
     }
 
@@ -110,10 +137,22 @@ export function makeAgentNode(deps: AgentDeps) {
       const reply = await withTimeout(bound.invoke(messages), AGENT_INVOKE_TIMEOUT_MS, "LLM invoke");
       return { messages: [reply] };
     } catch (e) {
-      if (!fallbackBound) throw e;
-      console.error("primary chat model failed, falling back to OpenRouter:", String((e as Error).message));
-      const reply = await withTimeout(fallbackBound.invoke(messages), AGENT_INVOKE_TIMEOUT_MS, "LLM invoke (fallback)");
-      return { messages: [reply] };
+      console.error("primary chat model failed:", String((e as Error).message));
+      if (fallbackBound) {
+        try {
+          const reply = await withTimeout(fallbackBound.invoke(messages), AGENT_INVOKE_TIMEOUT_MS, "LLM invoke (fallback)");
+          return { messages: [reply] };
+        } catch (e2) {
+          console.error("fallback chat model failed:", String((e2 as Error).message));
+        }
+      }
+      // Soft recovery — never throw past here. A thrown error becomes SSE `error` and the
+      // widget's generic "something hiccuped" line, which is worse than a brief retry ask.
+      return {
+        messages: [new AIMessage(
+          `Sorry — I blanked for a second. Mind trying that again? Or tell me what you'd like me to pass along to ${owner}.`,
+        )],
+      };
     }
   };
 }
