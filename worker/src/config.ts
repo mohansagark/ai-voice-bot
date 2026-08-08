@@ -5,6 +5,8 @@ export interface Persona {
   tone: string;
   facts: string[];
   do_not: string[];
+  /** Freeform CMS instructions appended to the system prompt. */
+  instructions?: string;
 }
 
 export interface ProviderConfig { model: string; baseURL?: string; keyEnv: string; }
@@ -19,6 +21,8 @@ export interface AppConfig {
   mode: "dev" | "prod";
   ttsVoice: string;
   maxTtsChars: number;
+  /** Public widget bootstrap from KV — safe to expose via GET /widget-config. */
+  widget: Record<string, unknown> | null;
   /**
    * Where persona/allowlist actually came from. "kv" means the synced `app_config` was
    * read successfully; "bootstrap" means we're on wrangler vars + built-in defaults —
@@ -34,6 +38,8 @@ export type PersonaOverride = Partial<Omit<Persona, "owner">> & { owner?: Partia
 export interface KvAppConfig {
   allowedOrigins?: string[];
   persona?: PersonaOverride;
+  /** Top-level CMS instructions (preferred) — folded into persona.instructions. */
+  instructions?: string;
   behavior?: {
     maxMessageChars?: number;
     maxTurnsPerSession?: number;
@@ -138,6 +144,7 @@ export function loadConfig(env: Env): AppConfig {
     mode: env.MODE === "dev" ? "dev" : "prod",
     ttsVoice: env.TTS_VOICE || "hannah",
     maxTtsChars: Number(env.MAX_TTS_CHARS || "1200"),
+    widget: null,
     configSource: "bootstrap",
   };
 }
@@ -161,15 +168,25 @@ export function applyKvAppConfig(base: AppConfig, raw: KvAppConfig | null | unde
   const origins = Array.isArray(raw.allowedOrigins)
     ? raw.allowedOrigins.map((s) => String(s).trim().replace(/\/+$/, "")).filter(Boolean)
     : [];
+  // Top-level CMS `instructions` wins over persona.instructions when both are present.
+  const topInstructions =
+    typeof raw.instructions === "string" && raw.instructions.trim()
+      ? raw.instructions.trim()
+      : undefined;
+  const personaOverride: PersonaOverride = {
+    ...(raw.persona ?? {}),
+    ...(topInstructions ? { instructions: topInstructions } : {}),
+  };
   return {
     ...base,
-    persona: mergePersona(base.persona, raw.persona),
+    persona: mergePersona(base.persona, personaOverride),
     allowedOrigins: origins.length ? origins : base.allowedOrigins,
     maxMessageChars: num(b.maxMessageChars, base.maxMessageChars),
     maxTurnsPerSession: num(b.maxTurnsPerSession, base.maxTurnsPerSession),
     ttsVoice: b.ttsVoice ?? base.ttsVoice,
     maxTtsChars: num(b.maxTtsChars, base.maxTtsChars),
     defaultProvider: b.defaultProvider ?? base.defaultProvider,
+    widget: raw.widget && typeof raw.widget === "object" ? raw.widget : base.widget,
     configSource: "kv",
   };
 }

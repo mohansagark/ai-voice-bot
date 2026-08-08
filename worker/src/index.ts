@@ -112,6 +112,20 @@ export function createApp(
         );
       }
 
+      // Public branding/behaviour for the embed — no secrets. Same CORS allowlist as /chat.
+      if (url.pathname === "/widget-config" && request.method === "GET") {
+        if (enforce && !originAllowed(origin, config.allowedOrigins, false)) {
+          return Response.json({ error: "origin not allowed" }, { status: 403, headers: cors });
+        }
+        if (!config.widget) {
+          return Response.json(
+            { error: "widget config not synced", config: config.configSource },
+            { status: 404, headers: cors },
+          );
+        }
+        return Response.json({ widget: config.widget }, { headers: cors });
+      }
+
       if (url.pathname === "/chat" && request.method === "POST") {
         if (enforce && !originAllowed(origin, config.allowedOrigins, false)) {
           return Response.json({ error: "origin not allowed" }, { status: 403, headers: cors });

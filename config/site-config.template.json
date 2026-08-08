@@ -22,6 +22,7 @@
       "confirm calendar availability or treat a preferred time as a booked meeting"
     ]
   },
+  "instructions": "Keep replies short unless the visitor asks about Alex's work. Help capture meeting interest via the time picker without confirming availability.",
   "behavior": {
     "defaultProvider": "groq",
     "maxMessageChars": 2000,
@@ -32,12 +33,16 @@
   "widget": {
     "branding": {
       "botName": "Leo",
-      "greeting": "Hi, I'm Leo — Alex's assistant. Ask me about their work, projects, or how to get in touch."
+      "greeting": "Hi, I'm Leo — Alex's assistant. Ask me about their work, projects, or how to get in touch.",
+      "themeColor": "#6C5CE7",
+      "themeColorSecondary": "#6C5CE7",
+      "position": "bottom-right"
     },
     "behavior": {
       "autoGreet": true,
       "rememberReturning": true,
-      "language": "en-US"
+      "language": "en-US",
+      "proactiveGreet": true
     },
     "privacy": {
       "consentText": "I agree to share my info so I can be followed up with.",
@@ -45,7 +50,8 @@
     },
     "voice": {
       "enabled": true,
-      "speakByDefault": false
+      "speakByDefault": false,
+      "ttsVoice": "hannah"
     }
   }
 }
