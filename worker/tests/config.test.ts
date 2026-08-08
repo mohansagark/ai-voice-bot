@@ -65,11 +65,24 @@ describe("applyKvAppConfig", () => {
         do_not: ["quote prices"],
       },
       behavior: { maxTurnsPerSession: 12 },
+      widget: { branding: { botName: "Leo", greeting: "Hi" } },
+      instructions: "Stay brief.",
     });
     expect(next.allowedOrigins).toEqual(["https://www.example.com", "https://blog.example.com"]);
     expect(next.persona.owner.name).toBe("Sam");
     expect(next.maxTurnsPerSession).toBe(12);
     expect(next.configSource).toBe("kv");
+    expect(next.widget).toEqual({ branding: { botName: "Leo", greeting: "Hi" } });
+    expect(next.persona.instructions).toBe("Stay brief.");
+  });
+
+  it("prefers top-level instructions over persona.instructions", () => {
+    const base = loadConfig({} as Env);
+    const next = applyKvAppConfig(base, {
+      instructions: "From top-level",
+      persona: { instructions: "From persona" },
+    });
+    expect(next.persona.instructions).toBe("From top-level");
   });
 
   it("never lets KV override mode — it is the master enforcement switch", () => {

@@ -241,6 +241,55 @@ describe("/chat (SSE + session memory)", () => {
     expect(okBody.origins).toBe(1);
   });
 
+  it("/widget-config returns the public widget slice from KV for an allowed origin", async () => {
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    const widget = {
+      branding: { botName: "Leo", greeting: "Hi there", themeColor: "#112233", position: "bottom-left" },
+      voice: { enabled: true, speakByDefault: false, ttsVoice: "hannah" },
+    };
+    const res = await app.fetch(
+      new Request("https://w/widget-config", { headers: { origin: "https://good.example" } }),
+      {
+        GROQ_API_KEY: "x",
+        MODE: "prod",
+        PORTFOLIO_KV: {
+          get: async () =>
+            JSON.stringify({
+              allowedOrigins: ["https://good.example"],
+              widget,
+              instructions: "Stay brief.",
+            }),
+        },
+      } as unknown as Env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { widget: typeof widget };
+    expect(body.widget).toEqual(widget);
+  });
+
+  it("/widget-config rejects a disallowed origin in prod", async () => {
+    const { getSession } = memSessions();
+    const { makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });
+    const app = createApp({ buildModel: fakeBuildModel, getSession, makeRunner });
+    const res = await app.fetch(
+      new Request("https://w/widget-config", { headers: { origin: "https://evil.example" } }),
+      {
+        GROQ_API_KEY: "x",
+        MODE: "prod",
+        PORTFOLIO_KV: {
+          get: async () =>
+            JSON.stringify({
+              allowedOrigins: ["https://good.example"],
+              widget: { branding: { botName: "Leo", greeting: "Hi" } },
+            }),
+        },
+      } as unknown as Env,
+    );
+    expect(res.status).toBe(403);
+  });
+
   it("rejects missing session_id/message with 400", async () => {
     const { getSession } = memSessions();
     const { makeRunner } = fakeRunnerFactory(["x"], { reply: "x", leadSaved: false, lead: {} });

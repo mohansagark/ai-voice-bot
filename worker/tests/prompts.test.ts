@@ -27,6 +27,21 @@ describe("buildSystemPrompt", () => {
   it("includes configured do_not rules from the persona", () => {
     for (const rule of defaultPersona.do_not) expect(prompt).toContain(rule);
   });
+  it("includes the owner bio when present", () => {
+    expect(prompt).toContain("Owner bio (from site config):");
+    expect(prompt).toContain(defaultPersona.bio);
+  });
+  it("appends SITE INSTRUCTIONS when persona.instructions is set", () => {
+    const withInstr = buildSystemPrompt({
+      ...defaultPersona,
+      instructions: "Always mention the portfolio blog when relevant.",
+    });
+    expect(withInstr).toContain("SITE INSTRUCTIONS");
+    expect(withInstr).toContain("Always mention the portfolio blog when relevant.");
+  });
+  it("omits SITE INSTRUCTIONS when instructions are empty", () => {
+    expect(buildSystemPrompt({ ...defaultPersona, instructions: "  " })).not.toContain("SITE INSTRUCTIONS");
+  });
   it("instructs to call save_lead", () => {
     expect(prompt).toContain("save_lead");
   });
