@@ -96,12 +96,23 @@ export function makeShowTimePickerNode(deps: AgentDeps) {
     const last = state.messages[state.messages.length - 1] as AIMessage;
     const call = (last.tool_calls ?? []).find((c) => c.name === "show_time_picker");
     if (!call) return {};
+    // Prefer any prose the model already produced alongside the tool call; otherwise a short
+    // canned ack. We END after this node (no second LLM round-trip) — looping back to
+    // `agent` for a "natural" follow-up was timing out under Workers and surfacing as the
+    // widget's "something hiccuped" error on every schedule request.
+    const prior = typeof last.content === "string" ? last.content.trim() : "";
+    const ack =
+      prior ||
+      `Sure — pick a time that works for you below, and I'll pass it along to ${deps.persona.owner.name}.`;
     return {
       uiComponent: "time_picker",
-      messages: [new ToolMessage({
-        tool_call_id: call.id!,
-        content: "The time picker is now showing in the chat UI for the visitor to fill in. Don't ask for a time in text or repeat the question — just acknowledge briefly and wait for their selection.",
-      })],
+      messages: [
+        new ToolMessage({
+          tool_call_id: call.id!,
+          content: "The time picker is now showing in the chat UI for the visitor to fill in.",
+        }),
+        new AIMessage(ack),
+      ],
     };
   };
 }

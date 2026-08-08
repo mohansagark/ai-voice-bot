@@ -22,6 +22,8 @@ export function buildGraph(deps: AgentDeps) {
     .addConditionalEdges("agent", routeAfterAgent, { save_lead: "save_lead", show_time_picker: "show_time_picker", end: END })
     .addConditionalEdges("save_lead", routeAfterSaveLead, { confirm: "confirm", agent: "agent" })
     .addEdge("confirm", END)
-    .addEdge("show_time_picker", "agent")
+    // End here with the ack from makeShowTimePickerNode — do not re-enter agent (second
+    // LLM invoke was hanging/timing out in production and breaking schedule turns).
+    .addEdge("show_time_picker", END)
     .compile();
 }
