@@ -8,41 +8,88 @@
   "properties": {
     "allowedOrigins": {
       "type": "array",
-      "items": { "type": "string", "format": "uri" },
-      "description": "Browser Origins allowed to call /chat, /tts, /lead in prod."
+      "items": {
+        "type": "string",
+        "pattern": "^https://[^/]+$"
+      },
+      "description": "Browser Origins allowed to call /chat, /tts, /lead in prod. Scheme + host (+ port) only — an Origin header never carries a path. Enforcement fails CLOSED: an empty or missing list denies every browser request.",
+      "minItems": 1
     },
     "persona": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "botName": { "type": "string" },
+        "botName": {
+          "type": "string"
+        },
         "owner": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "name": { "type": "string" },
-            "role": { "type": "string" }
+            "name": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            }
           },
-          "required": ["name", "role"]
+          "required": [
+            "name",
+            "role"
+          ]
         },
-        "bio": { "type": "string" },
-        "tone": { "type": "string" },
-        "facts": { "type": "array", "items": { "type": "string" } },
-        "do_not": { "type": "array", "items": { "type": "string" } }
+        "bio": {
+          "type": "string"
+        },
+        "tone": {
+          "type": "string"
+        },
+        "facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "do_not": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       },
-      "required": ["botName", "owner", "bio", "tone", "facts", "do_not"]
+      "required": [
+        "botName",
+        "owner",
+        "bio",
+        "tone",
+        "facts",
+        "do_not"
+      ]
     },
     "behavior": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "maxMessageChars": { "type": "integer", "minimum": 100 },
-        "maxTurnsPerSession": { "type": "integer", "minimum": 1 },
-        "ttsVoice": { "type": "string" },
-        "maxTtsChars": { "type": "integer", "minimum": 100 },
-        "defaultProvider": { "type": "string" },
-        "mode": { "type": "string", "enum": ["dev", "prod"] }
-      }
+        "maxMessageChars": {
+          "type": "integer",
+          "minimum": 100
+        },
+        "maxTurnsPerSession": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ttsVoice": {
+          "type": "string"
+        },
+        "maxTtsChars": {
+          "type": "integer",
+          "minimum": 100
+        },
+        "defaultProvider": {
+          "type": "string"
+        }
+      },
+      "description": "Runtime limits. `mode` is deliberately absent: it is the master enforcement switch and stays a Worker env var, so content edits can never disable the origin allowlist or rate limits."
     },
     "widget": {
       "type": "object",
@@ -53,42 +100,76 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "botName": { "type": "string" },
-            "greeting": { "type": "string" },
-            "themeColor": { "type": "string" },
-            "themeColorSecondary": { "type": "string" },
-            "position": { "type": "string" }
+            "botName": {
+              "type": "string"
+            },
+            "greeting": {
+              "type": "string"
+            },
+            "themeColor": {
+              "type": "string"
+            },
+            "themeColorSecondary": {
+              "type": "string"
+            },
+            "position": {
+              "type": "string"
+            }
           }
         },
         "behavior": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "autoGreet": { "type": "boolean" },
-            "rememberReturning": { "type": "boolean" },
-            "language": { "type": "string" },
-            "proactiveGreet": { "type": "boolean" }
+            "autoGreet": {
+              "type": "boolean"
+            },
+            "rememberReturning": {
+              "type": "boolean"
+            },
+            "language": {
+              "type": "string"
+            },
+            "proactiveGreet": {
+              "type": "boolean"
+            }
           }
         },
         "privacy": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "consentText": { "type": "string" },
-            "privacyPolicyUrl": { "type": ["string", "null"] }
+            "consentText": {
+              "type": "string"
+            },
+            "privacyPolicyUrl": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
           }
         },
         "voice": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled": { "type": "boolean" },
-            "speakByDefault": { "type": "boolean" },
-            "ttsVoice": { "type": "string" }
+            "enabled": {
+              "type": "boolean"
+            },
+            "speakByDefault": {
+              "type": "boolean"
+            },
+            "ttsVoice": {
+              "type": "string"
+            }
           }
         }
       }
     }
   },
-  "required": ["allowedOrigins", "persona"]
+  "required": [
+    "allowedOrigins",
+    "persona"
+  ]
 }

@@ -64,18 +64,45 @@ describe("applyKvAppConfig", () => {
         facts: ["Sam builds things."],
         do_not: ["quote prices"],
       },
-      behavior: { maxTurnsPerSession: 12, mode: "prod" },
+      behavior: { maxTurnsPerSession: 12 },
     });
     expect(next.allowedOrigins).toEqual(["https://www.example.com", "https://blog.example.com"]);
     expect(next.persona.owner.name).toBe("Sam");
     expect(next.maxTurnsPerSession).toBe(12);
+    expect(next.configSource).toBe("kv");
+  });
+
+  it("never lets KV override mode — it is the master enforcement switch", () => {
+    const base = loadConfig({ MODE: "prod" } as Env);
+    const next = applyKvAppConfig(base, { behavior: { mode: "dev" } } as never);
     expect(next.mode).toBe("prod");
+  });
+
+  it("coerces CMS-authored numeric strings and ignores unusable values", () => {
+    const base = loadConfig({} as Env);
+    const next = applyKvAppConfig(base, {
+      behavior: { maxMessageChars: "500" as unknown as number, maxTurnsPerSession: 0, maxTtsChars: NaN },
+    });
+    expect(next.maxMessageChars).toBe(500);
+    expect(next.maxTurnsPerSession).toBe(base.maxTurnsPerSession);
+    expect(next.maxTtsChars).toBe(base.maxTtsChars);
+  });
+
+  it("strips trailing slashes from KV origins so they can match an Origin header", () => {
+    const base = loadConfig({} as Env);
+    expect(applyKvAppConfig(base, { allowedOrigins: ["https://a.test/", " https://b.test "] }).allowedOrigins)
+      .toEqual(["https://a.test", "https://b.test"]);
   });
 
   it("keeps base config when KV overlay is empty", () => {
     const base = loadConfig({ ALLOWED_ORIGINS: "https://a.test" } as Env);
+    // null = nothing read, still bootstrap. {} = a real read that carried no overrides.
     expect(applyKvAppConfig(base, null)).toEqual(base);
-    expect(applyKvAppConfig(base, {})).toEqual(base);
+    expect(applyKvAppConfig(base, {})).toEqual({ ...base, configSource: "kv" });
+  });
+
+  it("marks env-only config as bootstrap so /health can flag an unsynced deploy", () => {
+    expect(loadConfig({} as Env).configSource).toBe("bootstrap");
   });
 
   it("mergePersona deep-merges owner", () => {

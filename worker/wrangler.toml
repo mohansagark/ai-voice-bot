@@ -28,6 +28,14 @@ id = "0ac98a2a6f5f428aafa4dd9e1d3f2feb"
 # Application SoT (persona, allowlist, knowledge) is synced into PORTFOLIO_KV
 # (`app_config` + `context`) — do not commit personal site config here.
 # See ../config/STORAGE.md and `node scripts/sync-config.mjs`.
+#
+# ALLOWED_ORIGINS is intentionally NOT set here: it is per-deployment, not per-repo.
+# Origin enforcement fails CLOSED, so until `app_config` is synced (or ALLOWED_ORIGINS is
+# set as a Worker var in the Cloudflare dashboard) every browser request gets a 403.
+# `GET /health` reports `"config":"bootstrap","origins":0` in exactly that state.
+#
+# MODE is env-only on purpose. It is the master enforcement switch, and KV `app_config`
+# is not allowed to override it — see applyKvAppConfig in src/config.ts.
 DEFAULT_PROVIDER = "groq"
 MAX_MESSAGE_CHARS = "2000"
 MAX_TURNS_PER_SESSION = "30"

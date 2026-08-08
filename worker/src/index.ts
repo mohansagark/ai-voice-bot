@@ -48,8 +48,20 @@ export interface Deps {
   getPortfolioContext?: (env: Env) => Promise<string>;
 }
 
+/**
+ * Fail CLOSED. An empty allowlist means "nothing is allowed", never "everything is".
+ *
+ * The allowlist used to be guaranteed non-empty by wrangler `[vars]`; it now comes from
+ * synced KV `app_config`, so a missing/failed sync must not silently open /chat, /lead,
+ * and /tts to every origin on the internet.
+ */
+function originAllowed(origin: string, allowed: string[], allowAll: boolean): boolean {
+  if (allowAll) return true;
+  return Boolean(origin) && allowed.includes(origin);
+}
+
 function corsHeaders(origin: string, allowed: string[], allowAll = false): Record<string, string> {
-  const ok = allowAll || allowed.length === 0 || allowed.includes(origin);
+  const ok = originAllowed(origin, allowed, allowAll);
   return {
     "access-control-allow-origin": ok && origin ? origin : "null",
     "access-control-allow-methods": "POST, GET, OPTIONS",
@@ -81,14 +93,27 @@ export function createApp(
 
       if (url.pathname === "/health") {
         const p = config.providers[config.defaultProvider];
+        // `config` + `origins` make an incomplete deploy diagnosable: configSource "bootstrap"
+        // with origins 0 in prod means the KV sync never ran and every browser call will 403.
+        const degraded = enforce && (config.configSource !== "kv" || config.allowedOrigins.length === 0);
         return Response.json(
-          { ok: true, provider: config.defaultProvider, model: p?.model, tts: env.GROQ_API_KEY ? "groq" : env.DEEPGRAM_API_KEY ? "deepgram" : "browser", leads: env.DB ? "d1" : "none", mode: config.mode },
+          {
+            ok: !degraded,
+            provider: config.defaultProvider,
+            model: p?.model,
+            tts: env.GROQ_API_KEY ? "groq" : env.DEEPGRAM_API_KEY ? "deepgram" : "browser",
+            leads: env.DB ? "d1" : "none",
+            mode: config.mode,
+            config: config.configSource,
+            origins: config.allowedOrigins.length,
+            ...(degraded ? { warning: "running on bootstrap config — run the deploy-time KV sync, see config/STORAGE.md" } : {}),
+          },
           { headers: cors },
         );
       }
 
       if (url.pathname === "/chat" && request.method === "POST") {
-        if (enforce && config.allowedOrigins.length && !config.allowedOrigins.includes(origin)) {
+        if (enforce && !originAllowed(origin, config.allowedOrigins, false)) {
           return Response.json({ error: "origin not allowed" }, { status: 403, headers: cors });
         }
         const body = (await request.json().catch(() => null)) as ChatBody | null;
@@ -161,7 +186,7 @@ export function createApp(
       }
 
       if (url.pathname === "/lead" && request.method === "POST") {
-        if (enforce && config.allowedOrigins.length && !config.allowedOrigins.includes(origin)) {
+        if (enforce && !originAllowed(origin, config.allowedOrigins, false)) {
           return Response.json({ error: "origin not allowed" }, { status: 403, headers: cors });
         }
         const body = (await request.json().catch(() => null)) as {
@@ -192,7 +217,7 @@ export function createApp(
       }
 
       if (url.pathname === "/tts" && request.method === "POST") {
-        if (enforce && config.allowedOrigins.length && !config.allowedOrigins.includes(origin)) {
+        if (enforce && !originAllowed(origin, config.allowedOrigins, false)) {
           return Response.json({ error: "origin not allowed" }, { status: 403, headers: cors });
         }
         const body = (await request.json().catch(() => null)) as { text?: string; voice?: string } | null;

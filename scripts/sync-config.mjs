@@ -17,7 +17,7 @@
  *   --cwd defaults to ./worker relative to this repo
  */
 
-import { readFileSync, existsSync, writeFileSync, mkdtempSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -41,10 +41,21 @@ function parseArgs(argv) {
   return out;
 }
 
+// Mirrors config/schema.json. Kept hand-rolled so this script has no dependencies —
+// if you change one, change the other.
 function validateConfig(cfg) {
   if (!cfg || typeof cfg !== "object") throw new Error("config must be a JSON object");
   if (!Array.isArray(cfg.allowedOrigins) || cfg.allowedOrigins.length === 0) {
+    // The Worker fails closed, so syncing an empty list would take the widget offline.
     throw new Error("config.allowedOrigins must be a non-empty array");
+  }
+  for (const o of cfg.allowedOrigins) {
+    if (typeof o !== "string" || !/^https:\/\/[^/]+$/.test(o)) {
+      throw new Error(`config.allowedOrigins entry ${JSON.stringify(o)} must be https:// + host only — an Origin header never carries a path or trailing slash`);
+    }
+  }
+  if (cfg.behavior && "mode" in cfg.behavior) {
+    throw new Error("config.behavior.mode is not syncable — mode is a Worker env var so content edits cannot disable enforcement");
   }
   if (!cfg.persona || typeof cfg.persona !== "object") throw new Error("config.persona is required");
   for (const k of ["botName", "bio", "tone", "facts", "do_not"]) {
@@ -73,13 +84,17 @@ function wrangler(args, { input } = {}) {
 function kvPut(key, value, dryRun) {
   const dir = mkdtempSync(join(tmpdir(), "avb-sync-"));
   const path = join(dir, key.replace(/\W+/g, "_"));
-  writeFileSync(path, value, "utf8");
-  console.log(`→ KV put ${key} (${value.length} bytes)`);
-  if (dryRun) {
-    console.log(`  (dry-run) skip wrangler kv key put ${key}`);
-    return;
+  try {
+    writeFileSync(path, value, "utf8");
+    console.log(`→ KV put ${key} (${value.length} bytes)`);
+    if (dryRun) {
+      console.log(`  (dry-run) skip wrangler kv key put ${key}`);
+      return;
+    }
+    wrangler(["kv", "key", "put", key, "--binding", "PORTFOLIO_KV", "--remote", "--path", path], {});
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
-  wrangler(["kv", "key", "put", key, "--binding", "PORTFOLIO_KV", "--path", path], {});
 }
 
 function secretPut(name, value, dryRun) {

@@ -19,19 +19,27 @@ export interface AppConfig {
   mode: "dev" | "prod";
   ttsVoice: string;
   maxTtsChars: number;
+  /**
+   * Where persona/allowlist actually came from. "kv" means the synced `app_config` was
+   * read successfully; "bootstrap" means we're on wrangler vars + built-in defaults —
+   * which in prod means an incomplete deploy, not a valid steady state.
+   */
+  configSource: "kv" | "bootstrap";
 }
 
 /** Site config blob stored in PORTFOLIO_KV under key `app_config` (synced at deploy time). */
+/** A partial persona: every field optional, including individual `owner` fields. */
+export type PersonaOverride = Partial<Omit<Persona, "owner">> & { owner?: Partial<Persona["owner"]> };
+
 export interface KvAppConfig {
   allowedOrigins?: string[];
-  persona?: Partial<Persona> & { owner?: Partial<Persona["owner"]> };
+  persona?: PersonaOverride;
   behavior?: {
     maxMessageChars?: number;
     maxTurnsPerSession?: number;
     ttsVoice?: string;
     maxTtsChars?: number;
     defaultProvider?: string;
-    mode?: "dev" | "prod";
   };
   widget?: Record<string, unknown>;
 }
@@ -62,7 +70,7 @@ export interface Env {
   RESEND_API_KEY?: string;
   // Optional, deployment-specific: portfolio knowledge (`context`) + site app config
   // (`app_config`) live in KV so the shared worker repo stays free of personal SoT data.
-  PORTFOLIO_KV?: { get(key: string): Promise<string | null> };
+  PORTFOLIO_KV?: { get(key: string, options?: { cacheTtl?: number }): Promise<string | null> };
 }
 
 export const defaultPersona: Persona = {
@@ -77,12 +85,18 @@ export const defaultPersona: Persona = {
   do_not: ["quote prices", "commit to dates", "schedule meetings"],
 };
 
-export function mergePersona(base: Persona, override?: Partial<Persona> & { owner?: Partial<Persona["owner"]> }): Persona {
+/** Drop keys whose value is undefined so a partial overlay can never blank a base field. */
+function defined<T extends object>(o: T | undefined): Partial<T> {
+  if (!o) return {};
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+
+export function mergePersona(base: Persona, override?: PersonaOverride): Persona {
   if (!override) return base;
   return {
     ...base,
-    ...override,
-    owner: { ...base.owner, ...(override.owner ?? {}) },
+    ...defined(override),
+    owner: { ...base.owner, ...defined(override.owner) },
   };
 }
 
@@ -124,36 +138,65 @@ export function loadConfig(env: Env): AppConfig {
     mode: env.MODE === "dev" ? "dev" : "prod",
     ttsVoice: env.TTS_VOICE || "hannah",
     maxTtsChars: Number(env.MAX_TTS_CHARS || "1200"),
+    configSource: "bootstrap",
   };
 }
 
-/** Overlay synced KV `app_config` on top of env-derived config. KV wins for app fields. */
+/** A CMS-authored number may arrive as a string; only take it if it parses to something usable. */
+function num(v: unknown, fallback: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+/**
+ * Overlay synced KV `app_config` on top of env-derived config. KV wins for app fields.
+ *
+ * `mode` is deliberately NOT overridable from KV: it is the master enforcement switch
+ * (`enforce = mode === "prod"`), and content edited through a CMS must never be able to
+ * turn off the origin allowlist, spam detection, or the rate limits.
+ */
 export function applyKvAppConfig(base: AppConfig, raw: KvAppConfig | null | undefined): AppConfig {
   if (!raw || typeof raw !== "object") return base;
   const b = raw.behavior ?? {};
+  const origins = Array.isArray(raw.allowedOrigins)
+    ? raw.allowedOrigins.map((s) => String(s).trim().replace(/\/+$/, "")).filter(Boolean)
+    : [];
   return {
     ...base,
     persona: mergePersona(base.persona, raw.persona),
-    allowedOrigins: Array.isArray(raw.allowedOrigins) && raw.allowedOrigins.length
-      ? raw.allowedOrigins.map((s) => String(s).trim()).filter(Boolean)
-      : base.allowedOrigins,
-    maxMessageChars: b.maxMessageChars ?? base.maxMessageChars,
-    maxTurnsPerSession: b.maxTurnsPerSession ?? base.maxTurnsPerSession,
+    allowedOrigins: origins.length ? origins : base.allowedOrigins,
+    maxMessageChars: num(b.maxMessageChars, base.maxMessageChars),
+    maxTurnsPerSession: num(b.maxTurnsPerSession, base.maxTurnsPerSession),
     ttsVoice: b.ttsVoice ?? base.ttsVoice,
-    maxTtsChars: b.maxTtsChars ?? base.maxTtsChars,
+    maxTtsChars: num(b.maxTtsChars, base.maxTtsChars),
     defaultProvider: b.defaultProvider ?? base.defaultProvider,
-    mode: b.mode === "dev" || b.mode === "prod" ? b.mode : base.mode,
+    configSource: "kv",
   };
 }
 
+/**
+ * KV values are edge-cached for this long. Config changes land within a minute or two of a
+ * sync, which is the right trade for not paying a KV round trip on every preflight.
+ */
+const APP_CONFIG_CACHE_TTL = 300;
+
 export async function mergeKvAppConfig(env: Env, base: AppConfig): Promise<AppConfig> {
-  if (!env.PORTFOLIO_KV) return base;
+  // Only worth shouting about in prod — local/dev runs legitimately have no KV bound.
+  const warn = (msg: string) => { if (base.mode === "prod") console.error(msg); };
+
+  if (!env.PORTFOLIO_KV) {
+    warn("PORTFOLIO_KV is not bound — running on bootstrap config, origin allowlist may be empty.");
+    return base;
+  }
   try {
-    const raw = await env.PORTFOLIO_KV.get("app_config");
-    if (!raw) return base;
+    const raw = await env.PORTFOLIO_KV.get("app_config", { cacheTtl: APP_CONFIG_CACHE_TTL });
+    if (!raw) {
+      warn("KV `app_config` is empty — running on bootstrap config. Run the deploy-time sync (see config/STORAGE.md).");
+      return base;
+    }
     return applyKvAppConfig(base, JSON.parse(raw) as KvAppConfig);
   } catch (e) {
-    console.error("PORTFOLIO_KV app_config read failed (continuing with env/defaults):", String((e as Error).message));
+    warn(`KV \`app_config\` read/parse failed, running on bootstrap config: ${String((e as Error).message)}`);
     return base;
   }
 }
